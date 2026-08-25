@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 version: '3.9'
 
 services:
@@ -18,3 +19,156 @@ services:
 
 volumes:
   postgres_data:
+=======
+services:
+
+  postgres:
+
+    image: pgvector/pgvector:pg16
+
+    container_name: srw_postgres
+
+    restart: unless-stopped
+
+    environment:
+
+      POSTGRES_DB: semantic_workspace
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+    ports:
+
+      - "5432:5432"
+
+    volumes:
+
+      - postgres_data:/var/lib/postgresql/data
+
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+
+  backend:
+
+    build:
+      context: ../backend
+
+    container_name: srw_backend
+
+    restart: unless-stopped
+
+    depends_on:
+
+      - postgres
+      - redis
+      - minio
+
+    environment:
+
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: semantic_workspace
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+      OPENALEX_API_KEY: ${OPENALEX_API_KEY}
+      CORE_API_KEY: ${CORE_API_KEY}
+
+    ports:
+
+      - "8000:8000"
+
+
+  redis:
+
+    image: redis:7-alpine
+
+    container_name: srw_redis
+
+    restart: unless-stopped
+
+    ports:
+
+      - "6379:6379"
+
+    volumes:
+
+      - redis_data:/data
+
+    command: redis-server --appendonly yes
+
+
+  minio:
+
+    image: minio/minio:latest
+
+    container_name: srw_minio
+
+    restart: unless-stopped
+
+    environment:
+
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+
+    ports:
+
+      - "9000:9000"
+      - "9001:9001"
+
+    volumes:
+
+      - minio_data:/data
+
+    command: server /data --console-address ":9001"
+
+
+  worker:
+
+    build:
+      context: ../backend
+
+    container_name: srw_worker
+
+    restart: unless-stopped
+
+    depends_on:
+
+      - redis
+      - postgres
+      - minio
+
+    environment:
+
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: semantic_workspace
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+
+      MINIO_HOST: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+
+      OPENALEX_API_KEY: ${OPENALEX_API_KEY}
+      CORE_API_KEY: ${CORE_API_KEY}
+
+    command:
+      [
+        "python",
+        "-m",
+        "app.worker.worker"
+      ]
+
+
+volumes:
+
+  postgres_data:
+
+  redis_data:
+
+  minio_data:
+>>>>>>> b1f7b0f (Changed the files to adapt to any api key. and brought in microservices into the workflow)
