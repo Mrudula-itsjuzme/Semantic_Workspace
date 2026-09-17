@@ -16,7 +16,7 @@ import SynthesisView from './components/SynthesisView';
 import AiAssistant from './components/AiAssistant';
 import LibraryView from './components/LibraryView';
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = 'http://localhost:8000';
 
 // Read canvas element & connection counts live from localStorage
 function getCanvasStats() {
@@ -216,7 +216,7 @@ export default function App() {
   const handleIngestPaper = async (paper) => {
     setIngestingId(paper.openalex_id || paper.title);
     try {
-      const res = await axios.post(`${API_BASE}/papers/ingest`, {
+      const res = await axios.post(`${API_BASE}/papers/import`, {
         title: paper.title,
         abstract: paper.abstract,
         doi: paper.doi,
