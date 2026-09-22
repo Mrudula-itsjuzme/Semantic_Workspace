@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Search, Bell, ChevronDown, User, FlaskConical } from 'lucide-react';
+import { Sparkles, Search, Bell, ChevronDown, User, FlaskConical, Pencil, Check } from 'lucide-react';
 
 export default function Header({
   projects,
@@ -13,6 +13,8 @@ export default function Header({
 }) {
   const [askQuery, setAskQuery] = useState('');
   const [showProjectMenu, setShowProjectMenu] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(selectedProject);
 
   const handleSearchKeyDown = (e) => {
     if (e.key === 'Enter') onSearch();
@@ -56,8 +58,34 @@ export default function Header({
 
         <div style={{ width: '1px', height: '28px', background: 'var(--border-color)', flexShrink: 0 }} />
 
-        {/* Project Selector */}
+        {/* Project Selector — renameable, persisted in localStorage by App */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
+          {renaming ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <input
+                autoFocus
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setSelectedProject(renameValue.trim() || selectedProject);
+                    setRenaming(false);
+                  } else if (e.key === 'Escape') setRenaming(false);
+                }}
+                style={{
+                  border: '1px solid #93c5fd', borderRadius: 'var(--radius-md)',
+                  padding: '6px 10px', fontSize: '0.84rem', fontWeight: 700, color: '#0f172a',
+                  outline: 'none', width: '180px'
+                }}
+              />
+              <button
+                onClick={() => { setSelectedProject(renameValue.trim() || selectedProject); setRenaming(false); }}
+                style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '6px', cursor: 'pointer', display: 'flex' }}
+              >
+                <Check size={13} color="#2563eb" />
+              </button>
+            </div>
+          ) : (
           <button
             onClick={() => setShowProjectMenu(v => !v)}
             style={{
@@ -70,8 +98,15 @@ export default function Header({
             <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {selectedProject}
             </span>
+            <Pencil
+              size={11}
+              color="#94a3b8"
+              onClick={(e) => { e.stopPropagation(); setRenameValue(selectedProject); setRenaming(true); }}
+              style={{ cursor: 'pointer' }}
+            />
             <ChevronDown size={13} color="#64748b" />
           </button>
+          )}
 
           {showProjectMenu && (
             <div style={{

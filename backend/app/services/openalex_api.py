@@ -1,6 +1,6 @@
 import httpx
 
-from app.core.config import settings
+from app.core.config import get_settings
 from app.schemas.external_paper import ExternalPaper, ExternalAuthor
 
 
@@ -121,8 +121,10 @@ async def search_openalex(
     params = {
         "search": query,
         "per-page": per_page,
-        "api_key": settings.openalex_api_key,
     }
+    api_key = get_settings().openalex_api_key
+    if api_key:
+        params["api_key"] = api_key
 
     async with httpx.AsyncClient(
         timeout=30.0
@@ -177,9 +179,10 @@ async def get_openalex_work(
 
     url = f"{OPENALEX_URL}/{work_id}"
 
-    params = {
-        "api_key": settings.openalex_api_key,
-    }
+    params = {}
+    api_key = get_settings().openalex_api_key
+    if api_key:
+        params["api_key"] = api_key
 
     # ---------------------------------------------------------
     # Request

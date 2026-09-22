@@ -12,10 +12,10 @@ export default function SearchBar({
   isLoading
 }) {
   const sampleQueries = [
-    "Transformer self-attention efficiency in NLP",
-    "Monadic semantics and monoid transformers",
-    "Deep learning neural networks for power systems",
-    "Temporal counting logic into Softmax Transformers"
+    "transformer self-attention efficiency",
+    "graph neural networks for molecules",
+    "retrieval augmented generation evaluation",
+    "uncertainty estimation in LLMs"
   ];
 
   const handleKeyDown = (e) => {
@@ -66,10 +66,10 @@ export default function SearchBar({
           </span>
 
           {[
-            { id: 'semantic', label: 'Semantic Vector', icon: Sparkles, desc: 'pgvector Cosine Similarity' },
-            { id: 'hybrid', label: 'Hybrid RRF', icon: Zap, desc: 'Vector + BM25 Full-Text Rank' },
+            { id: 'hybrid', label: 'Hybrid RRF', icon: Zap, desc: 'Reciprocal Rank Fusion: FTS + pgvector' },
+            { id: 'vector', label: 'Semantic Vector', icon: Sparkles, desc: 'pgvector Cosine Similarity' },
+            { id: 'lexical', label: 'Lexical FTS', icon: HardDrive, desc: 'PostgreSQL Full-Text Search' },
             { id: 'live', label: 'OpenAlex Live', icon: Globe, desc: 'Live OpenAlex API Search' },
-            { id: 'local', label: 'Local SQL', icon: HardDrive, desc: 'Direct Title/Abstract Match' },
           ].map(m => {
             const Icon = m.icon;
             const isSelected = searchMode === m.id;
@@ -100,7 +100,7 @@ export default function SearchBar({
         </div>
 
         {/* Min Score Threshold Slider */}
-        {searchMode === 'semantic' && (
+        {searchMode === 'vector' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
             <Filter size={14} />
             <span>Min Similarity: <strong style={{ color: '#fff' }}>{minScore}%</strong></span>

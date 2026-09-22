@@ -10,9 +10,12 @@ router = APIRouter()
 @router.get("/papers")
 def list_papers(db: Session = Depends(get_db)):
     result = db.execute(text("""
-        SELECT id, title, abstract, publication_year, doi, venue, pdf_path, created_at
-        FROM papers
-        ORDER BY created_at DESC
+        SELECT p.id, p.title, p.abstract, p.publication_year, p.doi, p.venue,
+               p.pdf_path, p.created_at, p.ingestion_status, p.ingestion_error,
+               p.ingestion_attempts,
+               (SELECT COUNT(*) FROM chunks c WHERE c.paper_id = p.id) AS chunk_count
+        FROM papers p
+        ORDER BY p.created_at DESC
     """))
     rows = result.fetchall()
     return [
@@ -25,6 +28,11 @@ def list_papers(db: Session = Depends(get_db)):
             "venue": r.venue,
             "pdf_path": r.pdf_path,
             "created_at": str(r.created_at) if r.created_at else None,
+            "ingestion_status": r.ingestion_status,
+            "ingestion_error": r.ingestion_error,
+            "ingestion_attempts": r.ingestion_attempts,
+            "chunk_count": r.chunk_count,
+            "source": "local",
         }
         for r in rows
     ]
@@ -43,6 +51,12 @@ def get_paper(paper_id: int, db: Session = Depends(get_db)):
     # Get chunks for this paper
     chunks = db.execute(
         text("SELECT id, chunk_index, content FROM chunks WHERE paper_id = :pid ORDER BY chunk_index"),
+        {"pid": paper_id},
+    ).fetchall()
+
+    # Get sections for this paper
+    sections = db.execute(
+        text("SELECT id, section_name, section_order FROM sections WHERE paper_id = :pid ORDER BY section_order"),
         {"pid": paper_id},
     ).fetchall()
 
@@ -67,6 +81,7 @@ def get_paper(paper_id: int, db: Session = Depends(get_db)):
         "venue": row.venue,
         "pdf_path": row.pdf_path,
         "authors": [{"name": a.name, "position": a.author_order} for a in authors],
+        "sections": [{"id": s.id, "section_name": s.section_name, "order": s.section_order} for s in sections],
         "chunks": [{"id": c.id, "chunk_index": c.chunk_index, "content": c.content} for c in chunks],
     }
 
@@ -85,5 +100,14 @@ def delete_paper(paper_id: int, db: Session = Depends(get_db)):
     # Delete cascades to chunks, sections, paper_authors via FK constraints
     db.execute(text("DELETE FROM papers WHERE id = :pid"), {"pid": paper_id})
     db.commit()
+
+    # Best-effort cleanup of the mirrored graph node; failure here must not
+    # prevent the Postgres delete from succeeding.
+    try:
+        from app.services import graph_sync
+
+        graph_sync.delete_paper(paper_id)
+    except Exception:
+        pass
 
     return {"message": "Paper deleted", "paper_id": paper_id}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Cpu, Sparkles, Trash2, CheckCircle2, FileText, ArrowRight } from 'lucide-react';
 import axios from 'axios';
+import { apiUrl } from '../api';
 
 export default function SynthesisView({ selectedPapers, onRemovePaper, onInspectPaper }) {
   const [synthesisResult, setSynthesisResult] = useState(null);
@@ -8,10 +9,17 @@ export default function SynthesisView({ selectedPapers, onRemovePaper, onInspect
 
   const handleSynthesize = async () => {
     if (!selectedPapers || selectedPapers.length === 0) return;
+    const pids = selectedPapers.map(p => p.id || p.paper_id).filter(Boolean);
+    if (pids.length === 0) {
+      alert(
+        "None of the selected papers are in your library yet. " +
+        "Import them from the live results first (Ingest to Vector DB), then compare."
+      );
+      return;
+    }
     setIsSynthesizing(true);
     try {
-      const pids = selectedPapers.map(p => p.id || p.paper_id).filter(Boolean);
-      const res = await axios.post('http://localhost:8000/api/ai/synthesize', { paper_ids: pids });
+      const res = await axios.post(apiUrl('/api/ai/synthesize'), { paper_ids: pids });
       setSynthesisResult(res.data);
     } catch (err) {
       console.error("Synthesis error:", err);

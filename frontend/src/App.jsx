@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { ChevronDown, ChevronUp, FileText, CheckSquare, Edit3 } from 'lucide-react';
 
+import { API_BASE } from './api';
+
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import ResearchCanvas from './components/ResearchCanvas';
@@ -15,8 +17,7 @@ import PaperCard from './components/PaperCard';
 import SynthesisView from './components/SynthesisView';
 import AiAssistant from './components/AiAssistant';
 import LibraryView from './components/LibraryView';
-
-const API_BASE = 'http://localhost:8000';
+import GraphExplorer from './components/GraphExplorer';
 
 // Read canvas element & connection counts live from localStorage
 function getCanvasStats() {
@@ -31,7 +32,9 @@ function getCanvasStats() {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('canvas');
-  const [selectedProject, setSelectedProject] = useState('Uncertainty-Aware LLM Reasoning');
+  const [selectedProject, setSelectedProject] = useState(
+    () => localStorage.getItem('srw_project_name') || 'Untitled Research Project'
+  );
 
   // Backend health stats (papers, vector chunks, db status)
   const [healthStats, setHealthStats] = useState(null);
@@ -42,10 +45,10 @@ export default function App() {
   const [bottomDockTab, setBottomDockTab] = useState('papers');
   const [isDockCollapsed, setIsDockCollapsed] = useState(false);
 
-  // Search state
+  // Search state — default to hybrid (RRF) which is the strongest mode
   const [query, setQuery] = useState('');
-  const [searchMode, setSearchMode] = useState('semantic');
-  const [minScore, setMinScore] = useState(50);
+  const [searchMode, setSearchMode] = useState('hybrid');
+  const [minScore, setMinScore] = useState(0);
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
@@ -60,6 +63,11 @@ export default function App() {
     const saved = localStorage.getItem('srw_workspace_tasks_v2');
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Persist project name
+  useEffect(() => {
+    localStorage.setItem('srw_project_name', selectedProject);
+  }, [selectedProject]);
 
   // Persist tasks
   useEffect(() => {
@@ -129,10 +137,24 @@ export default function App() {
 
   const handleAskAi = () => setActiveTab('assistant');
 
+  // ⌘K / Ctrl+K focuses the header search box (the placeholder promises this)
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        document
+          .querySelector('header input[type="text"]')
+          ?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const handleTriggerCopilotTool = (toolId) => {
     if (toolId === 'related' || toolId === 'gaps') {
       setActiveTab('explorer');
-      handleSearch('uncertainty estimation calibration LLM reasoning', 'semantic', 40);
+      handleSearch(query || 'recent advances', 'hybrid', 0);
     } else if (toolId === 'compare') {
       setActiveTab('compare');
     } else if (toolId === 'tasks') {
@@ -214,33 +236,57 @@ export default function App() {
   };
 
   const handleIngestPaper = async (paper) => {
-    setIngestingId(paper.openalex_id || paper.title);
+    // Live results carry `openalex_id` / `source_id`; the backend ExternalPaper
+    // schema requires { source, source_id, title }.
+    const sourceId = paper.source_id || paper.openalex_id || paper.doi || `title:${paper.title}`;
+    const source = paper.source === 'openalex' || paper.source === 'OpenAlex Live'
+      ? 'openalex'
+      : (paper.source === 'core' ? 'core' : 'openalex');
+    setIngestingId(sourceId || paper.title);
     try {
       const res = await axios.post(`${API_BASE}/papers/import`, {
+        source,
+        source_id: sourceId,
         title: paper.title,
         abstract: paper.abstract,
         doi: paper.doi,
         publication_year: paper.publication_year,
         pdf_url: paper.pdf_url,
-        openalex_id: paper.openalex_id,
-        authors: paper.authors,
-        source: paper.source
+        authors: paper.authors || [],
+        cited_paper_ids: paper.cited_paper_ids || [],
+        cited_by_count: paper.cited_by_count
       });
       fetchHealth();
       fetchLibrary();
+      setIngestingId(null);
+      return res.data;
     } catch (err) {
       console.error('Ingest error:', err);
-      alert('Failed to ingest paper.');
-    } finally {
+      const detail = err?.response?.data?.detail;
+      const msg = typeof detail === 'string'
+        ? detail
+        : Array.isArray(detail)
+          ? detail.map(d => d.msg).join('; ')
+          : 'Failed to ingest paper.';
+      alert(`Failed to ingest paper: ${msg}`);
       setIngestingId(null);
+      throw err;
     }
   };
 
+  // Stable identity for compare-selection: DB papers by id, live catalogue
+  // results by their external id (title as last resort). A bare `p.id ===
+  // paper.id` matches every id-less card (undefined === undefined).
+  const paperKey = (p) =>
+    p?.id != null
+      ? `db:${p.id}`
+      : `live:${p?.openalex_id || p?.source_id || p?.doi || p?.title || ''}`;
+
   const handleToggleSynthesis = (paper) => {
     setSelectedSynthesisPapers(prev => {
-      const exists = prev.some(p => (p.id && p.id === paper.id) || p.title === paper.title);
-      return exists
-        ? prev.filter(p => p.id ? p.id !== paper.id : p.title !== paper.title)
+      const key = paperKey(paper);
+      return prev.some(p => paperKey(p) === key)
+        ? prev.filter(p => paperKey(p) !== key)
         : [...prev, paper];
     });
   };
@@ -268,7 +314,7 @@ export default function App() {
 
       {/* ── Header ── */}
       <Header
-        projects={['Uncertainty-Aware LLM Reasoning', 'Transformer Attention Efficiency', 'Monadic Semantics']}
+        projects={[]} // projects managed via Header inline rename, persisted to localStorage
         selectedProject={selectedProject}
         setSelectedProject={setSelectedProject}
         query={query}
@@ -384,7 +430,7 @@ export default function App() {
                   Results ({searchResults.length})
                 </h3>
                 <span style={{ fontSize: '0.78rem', color: 'var(--primary)', fontWeight: 600 }}>
-                  {searchMode === 'semantic' ? 'FastEmbed 384d · pgvector cosine' : searchMode}
+                  {searchMode === 'vector' ? 'FastEmbed 384d · pgvector cosine' : searchMode}
                 </span>
               </div>
               {searchResults.length === 0 && !isSearching && (
@@ -398,11 +444,18 @@ export default function App() {
                   paper={paper}
                   onInspect={handleInspectPaper}
                   onIngest={handleIngestPaper}
-                  isSelectedForSynthesis={selectedSynthesisPapers.some(p => p.id === paper.id || p.title === paper.title)}
+                  isSelectedForSynthesis={selectedSynthesisPapers.some(p => paperKey(p) === paperKey(paper))}
                   onToggleSynthesis={handleToggleSynthesis}
-                  isIngesting={ingestingId === paper.openalex_id || ingestingId === paper.title}
+                  isIngesting={ingestingId === (paper.source_id || paper.openalex_id) || ingestingId === paper.title}
                 />
               ))}
+            </div>
+          )}
+
+          {/* === Graph Tab === */}
+          {activeTab === 'graph' && (
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              <GraphExplorer onInspectPaper={handleInspectPaper} />
             </div>
           )}
 

@@ -1,20 +1,23 @@
-import os
-
 from redis import Redis
 from rq import Queue
 
+from app.core.config import get_settings
 
-REDIS_HOST = os.getenv("REDIS_HOST", "redis")
-REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 
+settings = get_settings()
 
 redis_connection = Redis(
-    host=REDIS_HOST,
-    port=REDIS_PORT,
+    host=settings.redis_host,
+    port=settings.redis_port,
 )
+
+# Long-lived pipeline jobs (PDF download, extraction, embedding) need far more
+# than RQ's 180s default; 30 minutes covers the slowest cold-start run.
+INGESTION_JOB_TIMEOUT = 1800
 
 
 paper_queue = Queue(
     "paper_tasks",
     connection=redis_connection,
+    default_timeout=INGESTION_JOB_TIMEOUT,
 )

@@ -1,0 +1,90 @@
+# Production override — use together with the base file:
+#   cp .env.example .env  (fill real secrets)
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Adds: nginx reverse proxy with HTTPS, resource limits, no source mounts,
+# no dev ports except through the proxy.
+services:
+  postgres:
+    restart: always
+    ports: []            # not exposed in production
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  redis:
+    restart: always
+    ports: []
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+
+  minio:
+    restart: always
+    ports:
+      - "9001:9001"      # console only via admin/VPN
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  neo4j:
+    restart: always
+    ports:
+      - "7474:7474"
+    environment:
+      NEO4J_server_memory_heap_max__size: 1G
+      NEO4J_server_memory_pagecache_size: 512M
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  backend:
+    restart: always
+    ports: []
+    volumes: []           # never mount source in production
+    environment:
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--proxy-headers", "--forwarded-allow-ips", "*"]
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  worker:
+    restart: always
+    volumes: []
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+  frontend:
+    restart: always
+    ports: []
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: srw_nginx
+    restart: always
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    deploy:
+      resources:
+        limits:
+          memory: 256m

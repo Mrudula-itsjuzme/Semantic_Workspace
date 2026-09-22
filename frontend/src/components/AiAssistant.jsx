@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sparkles, Send, BookOpen, Quote, HelpCircle } from 'lucide-react';
 import axios from 'axios';
+import { apiUrl } from '../api';
 
 export default function AiAssistant({ papers }) {
   const [question, setQuestion] = useState('');
@@ -22,7 +23,7 @@ export default function AiAssistant({ papers }) {
     setIsLoading(true);
 
     try {
-      const res = await axios.post('http://localhost:8000/api/ai/ask', { question: userQ });
+      const res = await axios.post(apiUrl('/api/ai/ask'), { question: userQ });
       setMessages(prev => [
         ...prev,
         {
@@ -89,7 +90,7 @@ export default function AiAssistant({ papers }) {
                 {msg.citations.map((c, ci) => (
                   <div key={ci} style={{ background: 'rgba(0, 0, 0, 0.3)', padding: '8px 12px', borderRadius: '8px', marginBottom: '6px', fontSize: '0.8rem' }}>
                     <div style={{ fontWeight: 600, color: '#a5b4fc', marginBottom: '2px' }}>
-                      "{c.title}" ({c.year || 'N/A'}) — <span style={{ color: '#34d399' }}>{c.relevance_score}% Relevance</span>
+                      "{c.title}" ({c.year || 'N/A'}) — <span style={{ color: '#34d399' }}>{c.score != null ? `${c.score}% Relevance` : (c.relevance_score != null ? `${c.relevance_score}% Relevance` : '')}</span>
                     </div>
                     <div style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
                       "{c.snippet}"

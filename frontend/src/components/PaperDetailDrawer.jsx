@@ -17,9 +17,30 @@ export default function PaperDetailDrawer({ paper, onClose }) {
   };
 
   const handleCopyBibtex = () => {
-    navigator.clipboard.writeText(generateBibtex());
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const bibtex = generateBibtex();
+    const write = navigator.clipboard && window.document.hasFocus()
+      ? navigator.clipboard.writeText(bibtex)
+      : Promise.reject(new Error('clipboard unavailable'));
+    write.then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      // Fallback: legacy textarea copy so the button still works
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = bibtex;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        alert('Copy failed — select the BibTeX text manually.');
+      }
+    });
   };
 
   return (

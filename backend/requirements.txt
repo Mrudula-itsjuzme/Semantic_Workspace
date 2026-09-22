@@ -10,3 +10,13 @@ redis
 rq
 minio
 pypdf
+fonttools
+fastembed
+alembic
+neo4j
+openai
+python-multipart
+
+# testing
+pytest
+pytest-asyncio

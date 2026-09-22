@@ -1,3 +1,5 @@
+import os
+
 from sqlalchemy.orm import Session
 
 from app.models.paper import Paper, paper_authors
@@ -7,8 +9,19 @@ from app.schemas.external_paper import ExternalPaper
 from app.services.openalex_api import get_openalex_work
 
 
+# Opt-in switch: whether importing a paper may FETCH missing cited papers
+# from OpenAlex and insert them as new library rows.
+#
+# Default OFF — importing one paper must never silently grow the user's
+# library. Citation edges to papers that are ALREADY in the library are
+# always created; only the network fetch is gated.
+#
+# Set IMPORT_AUTO_FETCH_CITED=1 to restore the old behaviour (useful for
+# bulk-seeding a fresh installation).
+AUTO_FETCH_CITED = os.getenv("IMPORT_AUTO_FETCH_CITED", "0") == "1"
+
 # Maximum number of missing citations we automatically resolve
-# during one paper import.
+# during one paper import (only when AUTO_FETCH_CITED is enabled).
 MAX_CITATIONS_TO_RESOLVE = 10
 
 
@@ -38,8 +51,11 @@ async def ingest_paper(
 
     existing = None
 
+    # Normalize source casing — legacy rows used "CORE"/"OpenAlex"
+    source = (paper_data.source or "").strip().lower()
+
     # OpenAlex identity
-    if paper_data.source == "openalex":
+    if source == "openalex":
 
         existing = (
             db.query(Paper)
@@ -50,7 +66,7 @@ async def ingest_paper(
         )
 
     # CORE identity
-    elif paper_data.source == "core":
+    elif source == "core":
 
         existing = (
             db.query(Paper)
@@ -91,14 +107,14 @@ async def ingest_paper(
             # OpenAlex ID
             openalex_id=(
                 paper_data.source_id
-                if paper_data.source == "openalex"
+                if source == "openalex"
                 else None
             ),
 
             # CORE ID
             source_paper_id=(
                 paper_data.source_id
-                if paper_data.source == "core"
+                if source == "core"
                 else None
             ),
         )
@@ -243,10 +259,18 @@ async def ingest_citations(
         )
 
         # =================================================
-        # 2. FETCH MISSING PAPER
+        # 2. FETCH MISSING PAPER (opt-in only)
+        #
+        # By default a missing citation is skipped: importing one paper
+        # must not silently add other papers to the library. Edges to
+        # papers already present are still created below.
         # =================================================
 
         if not cited_paper:
+
+            if not AUTO_FETCH_CITED:
+                skipped += 1
+                continue
 
             try:
 

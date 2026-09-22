@@ -9,11 +9,17 @@ export default function PaperCard({
   onToggleSynthesis,
   isIngesting
 }) {
-  const getBadgeClass = (score, isIngested, source) => {
-    if (source === 'OpenAlex Live' && !isIngested) return 'badge-score-live';
+  const getBadgeClass = (score) => {
     if (score >= 80) return 'badge-score-high';
     return 'badge-score-medium';
   };
+
+  // Show the ingest action for live catalogue results that aren't in the
+  // library yet. Backend sends source "openalex"; some UI flows use
+  // "OpenAlex Live". Local/hybrid results already have numeric ids.
+  const isLiveResult =
+    (paper.source === 'openalex' || paper.source === 'OpenAlex Live') &&
+    !paper.id;
 
   return (
     <div className="glass-panel animate-fade-in" style={{ padding: '22px', marginBottom: '18px', position: 'relative' }}>
@@ -22,13 +28,13 @@ export default function PaperCard({
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
             {/* Match Score Badge */}
-            <span className={`badge-score-high ${getBadgeClass(paper.score, paper.is_ingested, paper.source)}`} style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700 }}>
+            <span className={`badge-score-high ${getBadgeClass(paper.score || 0)}`} style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: 700 }}>
               {paper.score ? `${paper.score}% Match` : 'Result'}
             </span>
 
             {/* Source Tag */}
             <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.06)', color: 'var(--text-muted)' }}>
-              {paper.source || 'Database'}
+              {paper.source === 'openalex' ? 'OpenAlex Live' : (paper.source || 'Database')}
             </span>
 
             {/* Year */}
@@ -141,7 +147,7 @@ export default function PaperCard({
           )}
 
           {/* Ingest to Local Vector DB button (for live search results) */}
-          {paper.source === 'OpenAlex Live' && !paper.is_ingested && (
+          {isLiveResult && (
             <button
               className="btn-secondary"
               onClick={() => onIngest(paper)}

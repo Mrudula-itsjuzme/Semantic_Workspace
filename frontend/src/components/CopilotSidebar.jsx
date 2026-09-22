@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sparkles, Search, Scale, Target, GitBranch, Quote, CheckSquare, ArrowRight, Check, Plus, AlertCircle, RefreshCw } from 'lucide-react';
 import axios from 'axios';
+import { apiUrl } from '../api';
 
 export default function CopilotSidebar({ onTriggerTool, onAddGeneratedTask, onAddPaperToCanvas }) {
   const [isScanning, setIsScanning] = useState(false);
@@ -10,12 +11,12 @@ export default function CopilotSidebar({ onTriggerTool, onAddGeneratedTask, onAd
     setIsScanning(true);
     try {
       // Read active canvas nodes from localStorage
-      const savedNodes = localStorage.getItem('srw_canvas_elements_v3');
+      const savedNodes = localStorage.getItem('srw_canvas_elements_v4');
       const canvasNodes = savedNodes ? JSON.parse(savedNodes) : [];
 
-      const res = await axios.post('http://localhost:8000/api/ai/parse-workspace', {
+      const res = await axios.post(apiUrl('/api/ai/parse-workspace'), {
         canvas_nodes: canvasNodes,
-        project_name: "Uncertainty-Aware LLM Reasoning"
+        project_name: localStorage.getItem('srw_project_name') || 'Untitled Research Project'
       });
 
       setParsedResults(res.data);
@@ -71,12 +72,12 @@ export default function CopilotSidebar({ onTriggerTool, onAddGeneratedTask, onAd
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
               <h4 style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <CheckSquare size={15} color="#2563eb" />
-                Auto-Generated Tasks ({parsedResults.generated_todos.length})
+                Auto-Generated Tasks ({(parsedResults.todos || []).length})
               </h4>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {parsedResults.generated_todos.map((todo) => (
+              {(parsedResults.todos || []).map((todo, ti) => (
                 <div key={todo.id} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px 10px', fontSize: '0.78rem' }}>
                   <div style={{ fontWeight: 600, color: '#0f172a', marginBottom: '4px', lineHeight: 1.3 }}>
                     {todo.text}
@@ -102,17 +103,17 @@ export default function CopilotSidebar({ onTriggerTool, onAddGeneratedTask, onAd
           <div className="ui-card" style={{ padding: '14px', borderLeft: '4px solid #16a34a' }}>
             <h4 style={{ fontSize: '0.84rem', fontWeight: 800, color: '#0f172a', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Search size={15} color="#16a34a" />
-              Recommended Papers ({parsedResults.recommended_papers.length})
+              Recommended Papers ({(parsedResults.related_papers || []).length})
             </h4>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {parsedResults.recommended_papers.map((p) => (
+              {(parsedResults.related_papers || []).map((p) => (
                 <div key={p.id} style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '8px 10px', fontSize: '0.78rem' }}>
                   <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '2px', lineHeight: 1.3 }}>
                     {p.title}
                   </div>
                   <div style={{ color: '#15803d', fontSize: '0.72rem', fontWeight: 600, marginBottom: '6px' }}>
-                    {p.score}% Semantic Match • {p.venue}
+                    {p.publication_year || ''} • In library
                   </div>
                   <button
                     onClick={() => onAddPaperToCanvas(p)}
@@ -133,8 +134,8 @@ export default function CopilotSidebar({ onTriggerTool, onAddGeneratedTask, onAd
               Open Research Gaps
             </h4>
             <ul style={{ paddingLeft: '16px', fontSize: '0.78rem', color: '#475569', lineHeight: 1.4 }}>
-              {parsedResults.research_gaps.map((gap, gi) => (
-                <li key={gi} style={{ marginBottom: '4px' }}>{gap}</li>
+              {(parsedResults.suggestions || []).map((gap, gi) => (
+                <li key={gi} style={{ marginBottom: '4px' }}>{gap.text}</li>
               ))}
             </ul>
           </div>

@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import {
   LayoutGrid, FileText, Layers, CheckSquare, GitCompare, Edit3,
-  Download, Database, Search, CheckCircle2, Activity
+  Download, Database, Search, CheckCircle2, Activity, Network
 } from 'lucide-react';
 
 export default function Sidebar({ activeTab, setActiveTab, stats, taskCount }) {
   const navItems = [
     { id: 'canvas',   label: 'Canvas',           icon: Layers },
     { id: 'explorer', label: 'Literature Search', icon: Search },
+    { id: 'graph',    label: 'Knowledge Graph',  icon: Network },
     { id: 'papers',   label: 'Papers Library',   icon: FileText },
     { id: 'compare',  label: 'Synthesis',         icon: GitCompare },
     { id: 'assistant',label: 'AI Assistant',      icon: Activity },

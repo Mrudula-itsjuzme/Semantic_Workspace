@@ -1,0 +1,31 @@
+{
+  "dataset": "srw-retrieval-eval-v1",
+  "description": "Judged queries for retrieval + GraphRAG evaluation. relevant_paper_ids map to the papers table ids in the seeded demo corpus.",
+  "queries": [
+    {
+      "id": "q1",
+      "query": "self-attention mechanism for sequence transduction",
+      "relevant_paper_ids": [1]
+    },
+    {
+      "id": "q2",
+      "query": "transformers applied to computer vision tasks",
+      "relevant_paper_ids": [2]
+    },
+    {
+      "id": "q3",
+      "query": "electrical power system transformers overview",
+      "relevant_paper_ids": [5]
+    },
+    {
+      "id": "q4",
+      "query": "attention is all you need",
+      "relevant_paper_ids": [1]
+    },
+    {
+      "id": "q5",
+      "query": "visual transformer image recognition",
+      "relevant_paper_ids": [2]
+    }
+  ]
+}

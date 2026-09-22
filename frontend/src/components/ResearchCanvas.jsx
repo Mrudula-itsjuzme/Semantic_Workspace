@@ -727,7 +727,7 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
       )}
 
       {/* RENDER DRAGGABLE & TYPABLE ELEMENTS */}
-      <div style={{ position: 'relative', zIndex: 20, width: '100%', height: '100%', pointerEvents: 'none' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 20, pointerEvents: 'none' }}>
         {elements.map((el) => {
           const isSelected = selectedElementId === el.id;
           const isEditing = editingElementId === el.id;
