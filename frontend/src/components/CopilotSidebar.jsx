@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Sparkles, Search, Scale, Target, GitBranch, Quote, CheckSquare, ArrowRight, Check, Plus, AlertCircle, RefreshCw } from 'lucide-react';
+import { Sparkles, Search, Scale, Target, GitBranch, Quote, CheckSquare, ArrowRight, Plus, AlertCircle, RefreshCw, X } from 'lucide-react';
 import axios from 'axios';
 import { apiUrl } from '../api';
 
-export default function CopilotSidebar({ onTriggerTool, onAddGeneratedTask, onAddPaperToCanvas }) {
+export default function CopilotSidebar({ onClose, onTriggerTool, onAddGeneratedTask, onAddPaperToCanvas }) {
   const [isScanning, setIsScanning] = useState(false);
   const [parsedResults, setParsedResults] = useState(null);
 
@@ -37,6 +37,7 @@ export default function CopilotSidebar({ onTriggerTool, onAddGeneratedTask, onAd
           <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
             Research Copilot
           </h3>
+          <button className="copilot-close" onClick={onClose} aria-label="Close research copilot"><X size={16} /></button>
         </div>
         <p style={{ fontSize: '0.78rem', color: '#64748b' }}>
           AI workspace parser & suggestions

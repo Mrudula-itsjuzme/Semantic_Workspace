@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
-import { Sparkles, Search, Bell, ChevronDown, FlaskConical, Pencil, Check } from 'lucide-react';
+import { Sparkles, Search, ChevronDown, FlaskConical, Pencil, Check, Plus, Send } from 'lucide-react';
 
 export default function Header({
   projects,
   selectedProject,
   setSelectedProject,
+  onSelectProject,
+  onCreateProject,
   query,
   setQuery,
   onSearch,
   onAskAi,
+  onToggleCopilot,
+  copilotOpen,
   stats,
 }) {
   const [askQuery, setAskQuery] = useState('');
@@ -22,14 +26,20 @@ export default function Header({
 
   const handleAskKeyDown = (e) => {
     if (e.key === 'Enter' && askQuery.trim()) {
-      onAskAi(askQuery);
+      onAskAi(askQuery.trim());
       setAskQuery('');
     }
   };
 
+  const submitAssistantQuestion = () => {
+    if (!askQuery.trim()) return;
+    onAskAi(askQuery.trim());
+    setAskQuery('');
+  };
+
   return (
     <header className="app-header" style={{
-      background: '#ffffff',
+      background: '#fffefa',
       borderBottom: '1px solid var(--border-color)',
       zIndex: 30,
       flexShrink: 0,
@@ -40,18 +50,15 @@ export default function Header({
         <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flexShrink: 0 }}>
           <div className="brand-mark" style={{
             width: '30px', height: '30px', borderRadius: '8px',
-            background: '#155eef',
+            background: '#d98669',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 3px 10px rgba(21,94,239,0.28)'
+            boxShadow: '0 3px 10px rgba(217,134,105,0.22)'
           }}>
             <FlaskConical size={16} color="#ffffff" />
           </div>
           <div>
-            <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', display: 'block', lineHeight: 1.1 }}>
+            <span style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 600, color: '#192638', letterSpacing: '-0.025em', display: 'block', lineHeight: 1.1 }}>
               Semantic Research
-            </span>
-            <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 500 }}>
-              Workspace
             </span>
           </div>
         </div>
@@ -90,12 +97,12 @@ export default function Header({
             onClick={() => setShowProjectMenu(v => !v)}
             style={{
               display: 'flex', alignItems: 'center', gap: '6px',
-              background: '#f8fafc', border: '1px solid #e2e8f0',
+              background: '#fffefa', border: '1px solid #e6e0d7',
               borderRadius: 'var(--radius-md)', padding: '6px 12px',
               cursor: 'pointer', transition: 'all 0.15s ease'
             }}
           >
-            <span style={{ fontSize: '0.84rem', fontWeight: 700, color: '#0f172a', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '0.84rem', fontWeight: 650, color: '#192638', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {selectedProject}
             </span>
             <Pencil
@@ -117,20 +124,23 @@ export default function Header({
             }}>
               {(projects || []).map((p) => (
                 <button
-                  key={p}
-                  onClick={() => { setSelectedProject(p); setShowProjectMenu(false); }}
+                  key={p.id}
+                  onClick={() => { onSelectProject(p.id); setRenameValue(p.name); setShowProjectMenu(false); }}
                   style={{
                     width: '100%', textAlign: 'left', padding: '9px 14px',
-                    background: p === selectedProject ? '#eff6ff' : '#ffffff',
-                    color: p === selectedProject ? '#2563eb' : '#0f172a',
+                    background: p.name === selectedProject ? '#f7e8df' : '#fffefa',
+                    color: p.name === selectedProject ? '#774735' : '#192638',
                     border: 'none', cursor: 'pointer', fontSize: '0.84rem',
-                    fontWeight: p === selectedProject ? 700 : 500,
+                    fontWeight: p.name === selectedProject ? 700 : 500,
                     borderBottom: '1px solid #f1f5f9'
                   }}
                 >
-                  {p}
+                  {p.name}
                 </button>
               ))}
+              <button className="project-menu-create" onClick={() => { onCreateProject(); setShowProjectMenu(false); }}>
+                <Plus size={14} /> New project
+              </button>
             </div>
           )}
         </div>
@@ -158,7 +168,7 @@ export default function Header({
           </div>
 
           <div style={{ position: 'relative', flex: 1 }}>
-            <Sparkles size={15} color="#2563eb" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+            <Sparkles size={15} color="#c66d50" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
             <input className="header-assistant-input"
               type="text"
               placeholder="Ask your research assistant…"
@@ -167,14 +177,17 @@ export default function Header({
               onKeyDown={handleAskKeyDown}
               style={{
                 width: '100%', padding: '8px 12px 8px 36px',
-                background: '#f0f6ff', border: '1px solid #bfdbfe',
+                background: '#fff4ef', border: '1px solid #f1d8cb',
                 borderRadius: 'var(--radius-md)', fontSize: '0.84rem',
-                outline: 'none', color: '#1e40af',
+                outline: 'none', color: '#884f3b',
                 transition: 'border-color 0.15s ease'
               }}
-              onFocus={e => e.target.style.borderColor = '#60a5fa'}
-              onBlur={e => e.target.style.borderColor = '#bfdbfe'}
+              onFocus={e => e.target.style.borderColor = '#d98669'}
+              onBlur={e => e.target.style.borderColor = '#f1d8cb'}
             />
+            <button className="assistant-send-button" onClick={submitAssistantQuestion} disabled={!askQuery.trim()} aria-label="Send question to assistant">
+              <Send size={15} />
+            </button>
           </div>
         </div>
 
@@ -193,11 +206,11 @@ export default function Header({
             {stats?.database === 'connected' ? `pgvector · ${stats?.total_papers ?? 0} papers` : 'DB Offline'}
           </div>
 
-          <button style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', width: '34px', height: '34px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-            <Bell size={15} color="#475569" />
+          <button className={`copilot-toggle ${copilotOpen ? 'is-active' : ''}`} onClick={onToggleCopilot} aria-label={copilotOpen ? 'Close research copilot' : 'Open research copilot'} title="Research Copilot">
+            <Sparkles size={16} />
           </button>
 
-          <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: 'linear-gradient(135deg, #2563eb, #7c3aed)', color: '#fff', fontWeight: 700, fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: '#dce9df', color: '#35574b', fontWeight: 700, fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             SR
           </div>
         </div>

@@ -47,7 +47,8 @@ html, body, #root {
 }
 
 body {
-  background: var(--bg-app);
+  background: var(--bg-app) url('/bg.jpg') no-repeat center center fixed;
+  background-size: cover;
   color: var(--text-main);
   font-family: var(--font-body);
   line-height: 1.5;
