@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Sparkles, Search, ChevronDown, FlaskConical, Pencil, Check, Plus, Send } from 'lucide-react';
+import { Sparkles, Search, ChevronDown, Leaf, Pencil, Check, Plus, Send, Edit3 } from 'lucide-react';
+import Notepad from './Notepad';
 
 export default function Header({
   projects,
@@ -19,6 +20,7 @@ export default function Header({
   const [showProjectMenu, setShowProjectMenu] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(selectedProject);
+  const [showNotepad, setShowNotepad] = useState(false);
 
   const handleSearchKeyDown = (e) => {
     if (e.key === 'Enter') onSearch();
@@ -54,7 +56,7 @@ export default function Header({
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 3px 10px rgba(217,134,105,0.22)'
           }}>
-            <FlaskConical size={16} color="#ffffff" />
+            <Leaf size={17} color="#ffffff" />
           </div>
           <div>
             <span style={{ fontFamily: 'Georgia, serif', fontSize: '1.05rem', fontWeight: 600, color: '#192638', letterSpacing: '-0.025em', display: 'block', lineHeight: 1.1 }}>
@@ -146,7 +148,7 @@ export default function Header({
         </div>
 
         {/* Search + Ask AI  */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1, maxWidth: '800px', margin: '0 auto' }}>
           <div style={{ position: 'relative', flex: 1 }}>
             <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
             <input className="header-search-input"
@@ -156,14 +158,15 @@ export default function Header({
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleSearchKeyDown}
               style={{
-                width: '100%', padding: '8px 12px 8px 36px',
+                width: '100%', padding: '9px 38px 9px 36px',
                 background: '#f8fafc', border: '1px solid #e2e8f0',
-                borderRadius: 'var(--radius-md)', fontSize: '0.84rem',
+                borderRadius: 'var(--radius-md)', fontSize: '0.85rem',
                 outline: 'none', color: '#0f172a',
-                transition: 'border-color 0.15s ease'
+                transition: 'all 0.15s ease',
+                boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.02)'
               }}
-              onFocus={e => e.target.style.borderColor = '#93c5fd'}
-              onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+              onFocus={e => { e.target.style.borderColor = '#93c5fd'; e.target.style.boxShadow = '0 0 0 3px rgba(147, 197, 253, 0.2)'; }}
+              onBlur={e => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'inset 0 1px 3px rgba(0,0,0,0.02)'; }}
             />
           </div>
 
@@ -176,16 +179,23 @@ export default function Header({
               onChange={(e) => setAskQuery(e.target.value)}
               onKeyDown={handleAskKeyDown}
               style={{
-                width: '100%', padding: '8px 12px 8px 36px',
+                width: '100%', padding: '9px 38px 9px 36px',
                 background: '#fff4ef', border: '1px solid #f1d8cb',
-                borderRadius: 'var(--radius-md)', fontSize: '0.84rem',
+                borderRadius: 'var(--radius-md)', fontSize: '0.85rem',
                 outline: 'none', color: '#884f3b',
-                transition: 'border-color 0.15s ease'
+                transition: 'all 0.15s ease',
+                boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.02)'
               }}
-              onFocus={e => e.target.style.borderColor = '#d98669'}
-              onBlur={e => e.target.style.borderColor = '#f1d8cb'}
+              onFocus={e => { e.target.style.borderColor = '#d98669'; e.target.style.boxShadow = '0 0 0 3px rgba(217, 134, 105, 0.2)'; }}
+              onBlur={e => { e.target.style.borderColor = '#f1d8cb'; e.target.style.boxShadow = 'inset 0 1px 3px rgba(0,0,0,0.02)'; }}
             />
-            <button className="assistant-send-button" onClick={submitAssistantQuestion} disabled={!askQuery.trim()} aria-label="Send question to assistant">
+            <button className="assistant-send-button" onClick={submitAssistantQuestion} disabled={!askQuery.trim()} aria-label="Send question to assistant"
+              style={{
+                position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)',
+                background: 'transparent', border: 'none', cursor: askQuery.trim() ? 'pointer' : 'default',
+                color: askQuery.trim() ? '#d98669' : '#fbcbb7', padding: '4px'
+              }}
+            >
               <Send size={15} />
             </button>
           </div>
@@ -206,9 +216,32 @@ export default function Header({
             {stats?.database === 'connected' ? `pgvector · ${stats?.total_papers ?? 0} papers` : 'DB Offline'}
           </div>
 
-          <button className={`copilot-toggle ${copilotOpen ? 'is-active' : ''}`} onClick={onToggleCopilot} aria-label={copilotOpen ? 'Close research copilot' : 'Open research copilot'} title="Research Copilot">
+          <button className={`copilot-toggle ${copilotOpen ? 'is-active' : ''}`} onClick={onToggleCopilot} aria-label={copilotOpen ? 'Close research copilot' : 'Open research copilot'} title="Research Copilot" style={{ background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '50%', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: copilotOpen ? '#d98669' : '#64748b', transition: 'all 0.15s ease' }}>
             <Sparkles size={16} />
           </button>
+
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowNotepad(!showNotepad)}
+              title="Quick Notes"
+              style={{
+                background: showNotepad ? '#f1f5f9' : 'transparent',
+                border: '1px solid var(--border-color)',
+                borderRadius: '50%',
+                width: '34px',
+                height: '34px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: showNotepad ? '#0f172a' : '#64748b',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Edit3 size={16} />
+            </button>
+            {showNotepad && <Notepad onClose={() => setShowNotepad(false)} />}
+          </div>
 
           <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: '#dce9df', color: '#35574b', fontWeight: 700, fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             SR

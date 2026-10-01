@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Sparkles, Send } from 'lucide-react';
 import axios from 'axios';
 import { apiUrl } from '../api';
 
-export default function AiAssistant() {
+export default function AiAssistant({ initialQuestion }) {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState([
     {
@@ -13,10 +13,11 @@ export default function AiAssistant() {
     }
   ]);
   const [isLoading, setIsLoading] = useState(false);
+  const submittedPromptId = useRef(null);
 
-  const handleSend = async () => {
-    if (!question.trim() || isLoading) return;
-    const userQ = question.trim();
+  const handleSend = useCallback(async (prompt = question) => {
+    if (!prompt.trim() || isLoading) return;
+    const userQ = prompt.trim();
     setQuestion('');
 
     setMessages(prev => [...prev, { sender: 'user', text: userQ }]);
@@ -45,7 +46,13 @@ export default function AiAssistant() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [question, isLoading]);
+
+  useEffect(() => {
+    if (!initialQuestion?.id || submittedPromptId.current === initialQuestion.id) return;
+    submittedPromptId.current = initialQuestion.id;
+    handleSend(initialQuestion.text);
+  }, [initialQuestion, handleSend]);
 
   return (
     <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', height: '650px' }}>
@@ -122,7 +129,7 @@ export default function AiAssistant() {
         />
         <button
           className="btn-primary"
-          onClick={handleSend}
+          onClick={() => handleSend()}
           disabled={isLoading || !question.trim()}
           style={{ height: '48px', padding: '0 20px' }}
         >

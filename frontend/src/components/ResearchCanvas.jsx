@@ -1,27 +1,37 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   MousePointer, StickyNote, Type, PenTool, Highlighter, Square,
   ArrowUpRight, FileText, Trash2, Sparkles, X, Bold, Italic 
 } from 'lucide-react';
 
-export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
+const DEFAULT_PROJECT_ID = 'workspace-default';
+
+function projectStorageKey(key, projectId) {
+  return projectId === DEFAULT_PROJECT_ID ? key : `${key}_${projectId}`;
+}
+
+function readStoredItems(key) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvasChange, addPaperRequest, projectId = DEFAULT_PROJECT_ID }) {
+  const elementsKey = projectStorageKey('srw_canvas_elements_v4', projectId);
+  const drawingsKey = projectStorageKey('srw_canvas_drawings_v4', projectId);
+  const connectionsKey = projectStorageKey('srw_canvas_connections_v4', projectId);
+
   // Canvas elements state (persistent via localStorage)
-  const [elements, setElements] = useState(() => {
-    const saved = localStorage.getItem('srw_canvas_elements_v4');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [elements, setElements] = useState(() => readStoredItems(elementsKey));
 
   // Freehand drawing paths state
-  const [drawings, setDrawings] = useState(() => {
-    const saved = localStorage.getItem('srw_canvas_drawings_v4');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [drawings, setDrawings] = useState(() => readStoredItems(drawingsKey));
 
   // Connections state
-  const [connections, setConnections] = useState(() => {
-    const saved = localStorage.getItem('srw_canvas_connections_v4');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [connections, setConnections] = useState(() => readStoredItems(connectionsKey));
 
   // Active Tool: 'select' | 'sticky' | 'text' | 'draw' | 'highlight' | 'shape' | 'arrow' | 'paper'
   const [activeTool, setActiveTool] = useState('select');
@@ -50,19 +60,43 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
   const containerRef = useRef(null);
   const drawingCanvasRef = useRef(null);
   const activeInputRef = useRef(null);
+  const processedPaperRequest = useRef(null);
+  const [drawingSurfaceSize, setDrawingSurfaceSize] = useState({ width: 0, height: 0 });
 
   // Save to localStorage
   useEffect(() => {
-    localStorage.setItem('srw_canvas_elements_v4', JSON.stringify(elements));
-  }, [elements]);
+    localStorage.setItem(elementsKey, JSON.stringify(elements));
+    onCanvasChange?.();
+  }, [elements, elementsKey, onCanvasChange]);
 
   useEffect(() => {
-    localStorage.setItem('srw_canvas_drawings_v4', JSON.stringify(drawings));
-  }, [drawings]);
+    localStorage.setItem(drawingsKey, JSON.stringify(drawings));
+    onCanvasChange?.();
+  }, [drawings, drawingsKey, onCanvasChange]);
 
   useEffect(() => {
-    localStorage.setItem('srw_canvas_connections_v4', JSON.stringify(connections));
-  }, [connections]);
+    localStorage.setItem(connectionsKey, JSON.stringify(connections));
+    onCanvasChange?.();
+  }, [connections, connectionsKey, onCanvasChange]);
+
+  useEffect(() => {
+    const canvas = drawingCanvasRef.current;
+    if (!canvas) return undefined;
+
+    const resizeSurface = () => {
+      const rect = canvas.getBoundingClientRect();
+      const pixelRatio = window.devicePixelRatio || 1;
+      canvas.width = Math.max(1, Math.round(rect.width * pixelRatio));
+      canvas.height = Math.max(1, Math.round(rect.height * pixelRatio));
+      canvas.getContext('2d')?.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      setDrawingSurfaceSize({ width: rect.width, height: rect.height });
+    };
+
+    const observer = new ResizeObserver(resizeSurface);
+    observer.observe(canvas);
+    resizeSurface();
+    return () => observer.disconnect();
+  }, []);
 
   // Auto-focus active input when editing starts
   useEffect(() => {
@@ -74,7 +108,7 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
   // Global Keyboard Shortcuts (Delete, Escape)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable || e.metaKey || e.ctrlKey || e.altKey) return;
       
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedElementId) {
@@ -85,6 +119,10 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
         setEditingElementId(null);
         setActiveTool('select');
         setConnectingFromId(null);
+      } else {
+        const toolShortcuts = { v: 'select', n: 'sticky', t: 'text', d: 'draw', h: 'highlight', a: 'arrow' };
+        const nextTool = toolShortcuts[e.key.toLowerCase()];
+        if (nextTool) setActiveTool(nextTool);
       }
     };
 
@@ -98,7 +136,7 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
     const canvas = drawingCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
     drawings.forEach(pathObj => {
       if (!pathObj.points || pathObj.points.length < 2) return;
@@ -130,7 +168,7 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
       }
       ctx.stroke();
     }
-  }, [drawings, currentPath, brushColor, brushSize, activeTool]);
+  }, [drawings, currentPath, brushColor, brushSize, activeTool, drawingSurfaceSize]);
 
   // INSTANT ELEMENT SPAWNING FUNCTION
   const spawnElementAtCoordinates = (x, y, forceType = null) => {
@@ -244,8 +282,8 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
     }
 
     if (draggedId) {
-      const newX = Math.max(10, e.clientX - dragOffset.x);
-      const newY = Math.max(10, e.clientY - dragOffset.y);
+      const newX = Math.max(10, e.clientX - rect.left - dragOffset.x);
+      const newY = Math.max(10, e.clientY - rect.top - dragOffset.y);
 
       setElements(prev => prev.map(el => {
         if (el.id === draggedId) {
@@ -297,9 +335,10 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
       const elem = elements.find(el => el.id === elemId);
       if (elem) {
         setDraggedId(elemId);
+        const rect = containerRef.current.getBoundingClientRect();
         setDragOffset({
-          x: e.clientX - elem.x,
-          y: e.clientY - elem.y
+          x: e.clientX - rect.left - elem.x,
+          y: e.clientY - rect.top - elem.y
         });
       }
     }
@@ -347,13 +386,13 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
       setConnections([]);
       setSelectedElementId(null);
       setEditingElementId(null);
-      localStorage.removeItem('srw_canvas_elements_v4');
-      localStorage.removeItem('srw_canvas_drawings_v4');
-      localStorage.removeItem('srw_canvas_connections_v4');
+      localStorage.removeItem(elementsKey);
+      localStorage.removeItem(drawingsKey);
+      localStorage.removeItem(connectionsKey);
     }
   };
 
-  const handleInsertPaperCard = (paper) => {
+  const handleInsertPaperCard = useCallback((paper) => {
     const newElem = {
       id: `paper_${paper.id || Date.now()}`,
       type: 'paper',
@@ -373,7 +412,13 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
     setElements(prev => [...prev, newElem]);
     setShowPaperModal(false);
     setSelectedElementId(newElem.id);
-  };
+  }, [elements.length]);
+
+  useEffect(() => {
+    if (!addPaperRequest || addPaperRequest.projectId !== projectId || processedPaperRequest.current === addPaperRequest.id) return;
+    processedPaperRequest.current = addPaperRequest.id;
+    handleInsertPaperCard(addPaperRequest.paper);
+  }, [addPaperRequest, projectId, handleInsertPaperCard]);
 
   const selectedElement = elements.find(el => el.id === selectedElementId);
 
@@ -388,12 +433,12 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
       className="research-canvas"
       style={{
         flex: 1,
-        background: '#f8fafc',
-        border: '1px solid #e2e8f0',
-        borderRadius: '16px',
+        background: '#fffefa',
+        border: '1px solid #e6e0d7',
+        borderRadius: '15px',
         position: 'relative',
         overflow: 'hidden',
-        minHeight: '700px',
+        minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
         userSelect: 'none',
@@ -403,14 +448,14 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
       {/* Infinite Grid Background */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        backgroundImage: 'radial-gradient(#cbd5e1 1.2px, transparent 1.2px)',
-        backgroundSize: '24px 24px',
-        opacity: 0.65,
+        backgroundImage: 'radial-gradient(#d9d1c5 1px, transparent 1px)',
+        backgroundSize: '22px 22px',
+        opacity: 0.42,
         pointerEvents: 'none'
       }} />
 
       {/* TOP FLOATING TOOLBAR */}
-      <div style={{
+      <div className="canvas-toolbar" style={{
         position: 'absolute',
         top: '16px',
         left: '50%',
@@ -427,10 +472,11 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
       }}>
         {/* Select Tool */}
         <button
+          className={`canvas-tool-button ${activeTool === 'select' ? 'is-active' : ''}`}
           onClick={() => setActiveTool('select')}
           style={{
             padding: '8px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600,
-            background: activeTool === 'select' ? '#eff6ff' : 'transparent', color: activeTool === 'select' ? '#2563eb' : '#475569'
+            background: activeTool === 'select' ? '#e6f0eb' : 'transparent', color: activeTool === 'select' ? '#38685c' : '#475569'
           }}
           title="Select & Move Tool (Double-click anywhere to type text)"
         >
@@ -442,10 +488,11 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
 
         {/* Sticky Note Tool */}
         <button
+          className={`canvas-tool-button ${activeTool === 'sticky' ? 'is-active' : ''}`}
           onClick={() => setActiveTool('sticky')}
           style={{
             padding: '8px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600,
-            background: activeTool === 'sticky' ? '#fef9c3' : 'transparent', color: activeTool === 'sticky' ? '#854d0e' : '#475569'
+            background: activeTool === 'sticky' ? '#fae8df' : 'transparent', color: activeTool === 'sticky' ? '#99563e' : '#475569'
           }}
           title="Click anywhere to drop sticky note"
         >
@@ -455,10 +502,11 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
 
         {/* Text Tool */}
         <button
+          className={`canvas-tool-button ${activeTool === 'text' ? 'is-active' : ''}`}
           onClick={() => setActiveTool('text')}
           style={{
             padding: '8px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600,
-            background: activeTool === 'text' ? '#eff6ff' : 'transparent', color: activeTool === 'text' ? '#2563eb' : '#475569'
+            background: activeTool === 'text' ? '#e6f0eb' : 'transparent', color: activeTool === 'text' ? '#38685c' : '#475569'
           }}
           title="Click anywhere to insert text box"
         >
@@ -468,10 +516,11 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
 
         {/* Freehand Draw */}
         <button
+          className={`canvas-tool-button ${activeTool === 'draw' ? 'is-active' : ''}`}
           onClick={() => setActiveTool('draw')}
           style={{
             padding: '8px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600,
-            background: activeTool === 'draw' ? '#eff6ff' : 'transparent', color: activeTool === 'draw' ? '#2563eb' : '#475569'
+            background: activeTool === 'draw' ? '#e6f0eb' : 'transparent', color: activeTool === 'draw' ? '#38685c' : '#475569'
           }}
           title="Freehand Draw Pen"
         >
@@ -481,10 +530,11 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
 
         {/* Highlighter */}
         <button
+          className={`canvas-tool-button ${activeTool === 'highlight' ? 'is-active' : ''}`}
           onClick={() => setActiveTool('highlight')}
           style={{
             padding: '8px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600,
-            background: activeTool === 'highlight' ? '#fef9c3' : 'transparent', color: activeTool === 'highlight' ? '#854d0e' : '#475569'
+            background: activeTool === 'highlight' ? '#fae8df' : 'transparent', color: activeTool === 'highlight' ? '#99563e' : '#475569'
           }}
           title="Highlighter Brush"
         >
@@ -495,10 +545,11 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
         {/* Shape Dropdown Tool */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <button
+            className={`canvas-tool-button ${activeTool === 'shape' ? 'is-active' : ''}`}
             onClick={() => setActiveTool('shape')}
             style={{
               padding: '8px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600,
-              background: activeTool === 'shape' ? '#f3e8ff' : 'transparent', color: activeTool === 'shape' ? '#7e22ce' : '#475569'
+              background: activeTool === 'shape' ? '#e6f0eb' : 'transparent', color: activeTool === 'shape' ? '#38685c' : '#475569'
             }}
           >
             <Square size={16} color="#9333ea" />
@@ -519,10 +570,11 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
 
         {/* Arrow Connector Tool */}
         <button
+          className={`canvas-tool-button ${activeTool === 'arrow' ? 'is-active' : ''}`}
           onClick={() => { setActiveTool('arrow'); setConnectingFromId(null); }}
           style={{
             padding: '8px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600,
-            background: activeTool === 'arrow' ? '#e0e7ff' : 'transparent', color: activeTool === 'arrow' ? '#3730a3' : '#475569'
+            background: activeTool === 'arrow' ? '#e6f0eb' : 'transparent', color: activeTool === 'arrow' ? '#38685c' : '#475569'
           }}
           title="Click source node -> click target node to draw arrow"
         >
@@ -532,10 +584,11 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
 
         {/* Insert Paper Tool */}
         <button
+          className="canvas-tool-button canvas-insert-paper"
           onClick={() => setShowPaperModal(true)}
           style={{
             padding: '8px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600,
-            background: '#ffe4e6', color: '#e11d48'
+            background: '#fae8df', color: '#99563e'
           }}
         >
           <FileText size={16} />
@@ -668,8 +721,6 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
       {/* HTML5 DRAWING CANVAS OVERLAY */}
       <canvas
         ref={drawingCanvasRef}
-        width={1400}
-        height={900}
         style={{
           position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
           pointerEvents: activeTool === 'draw' || activeTool === 'highlight' ? 'auto' : 'none',
@@ -712,19 +763,29 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
 
       {/* CANVAS EMPTY STATE GUIDE */}
       {elements.length === 0 && drawings.length === 0 && (
-        <div style={{
+        <div className="canvas-empty-state" style={{
           position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-          textAlign: 'center', color: '#94a3b8', zIndex: 5, maxWidth: '440px', pointerEvents: 'none'
+          textAlign: 'center', color: '#94a3b8', zIndex: 5, maxWidth: '480px'
         }}>
-          <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#ffffff', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-            <Sparkles size={32} color="#2563eb" />
-          </div>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>
-            Tap Anywhere to Type & Sketch
+          <div className="canvas-empty-mark"><Sparkles size={23} /></div>
+          <h3 style={{ fontFamily: 'Georgia, serif', fontSize: '2rem', fontWeight: 500, color: '#192638', marginBottom: '10px' }}>
+            Your research, <em style={{ color: '#d98669', fontStyle: 'normal' }}>visually.</em>
           </h3>
-          <p style={{ fontSize: '0.88rem', color: '#64748b', lineHeight: 1.5 }}>
-            Double-click anywhere on the canvas grid to instantly spawn a typable text box, drop sticky notes, freehand draw, or insert paper cards!
+          <p style={{ fontSize: '0.92rem', color: '#748196', lineHeight: 1.65, marginBottom: '20px' }}>
+            Add a thought, sketch a connection, or bring a paper into your research map.
           </p>
+          <div className="canvas-empty-actions">
+            <button className="canvas-start-button" onClick={(event) => {
+              event.stopPropagation();
+              spawnElementAtCoordinates(containerRef.current.clientWidth / 2 - 95, containerRef.current.clientHeight / 2 - 60, 'sticky');
+            }}>
+              <StickyNote size={16} /> Start with a note
+            </button>
+            <button className="canvas-paper-button" onClick={(event) => { event.stopPropagation(); setShowPaperModal(true); }}>
+              <FileText size={16} /> Add a paper
+            </button>
+          </div>
+          <p className="canvas-shortcut-note">Double-click to add text · N note · T text · D draw · V select</p>
         </div>
       )}
 
@@ -817,7 +878,7 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
 
       {/* PAPER INSERTION MODAL */}
       {showPaperModal && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(4px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div onClick={(event) => event.stopPropagation()} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(25, 38, 56, 0.28)', backdropFilter: 'blur(3px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div className="ui-card" style={{ width: '480px', maxHeight: '80vh', padding: '24px', background: '#ffffff', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>

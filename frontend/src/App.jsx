@@ -37,7 +37,8 @@ function readArray(key) {
 function getSavedProjects() {
   try {
     const saved = JSON.parse(localStorage.getItem('srw_projects_v1') || '[]');
-    if (Array.isArray(saved) && saved.some(project => project?.id && project?.name)) return saved;
+    const validProjects = Array.isArray(saved) ? saved.filter(project => project?.id && project?.name) : [];
+    if (validProjects.length) return validProjects;
   } catch { /* migrate the existing single project below */ }
   return [{
     id: DEFAULT_PROJECT_ID,
@@ -67,6 +68,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('canvas');
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [assistantPrompt, setAssistantPrompt] = useState(null);
+  const [canvasPaperRequest, setCanvasPaperRequest] = useState(null);
 
   // Backend health stats (papers, vector chunks, db status)
   const [healthStats, setHealthStats] = useState(null);
@@ -75,7 +77,7 @@ export default function App() {
 
   // Bottom dock: which panel is active, and whether it's collapsed
   const [bottomDockTab, setBottomDockTab] = useState('papers');
-  const [isDockCollapsed, setIsDockCollapsed] = useState(false);
+  const [isDockCollapsed, setIsDockCollapsed] = useState(true);
 
   // Search state — default to hybrid (RRF) which is the strongest mode
   const [query, setQuery] = useState('');
@@ -189,6 +191,10 @@ export default function App() {
   const handleCreateProject = () => {
     const name = window.prompt('Name your project');
     if (!name?.trim()) return;
+    if (projects.some(project => project.name.toLocaleLowerCase() === name.trim().toLocaleLowerCase())) {
+      window.alert('A project with that name already exists.');
+      return;
+    }
     const project = { id: `project_${Date.now()}`, name: name.trim() };
     setProjects(previous => [...previous, project]);
     setActiveProjectId(project.id);
@@ -202,6 +208,10 @@ export default function App() {
       project.id === activeProjectId ? { ...project, name: nextName } : project
     ));
   };
+
+  const handleCanvasChange = useCallback(() => {
+    setCanvasStats(getCanvasStats(activeProjectId));
+  }, [activeProjectId]);
 
   // ⌘K / Ctrl+K focuses the header search box (the placeholder promises this)
   useEffect(() => {
@@ -218,6 +228,7 @@ export default function App() {
   }, []);
 
   const handleTriggerCopilotTool = (toolId) => {
+    setCopilotOpen(false);
     if (toolId === 'related' || toolId === 'gaps') {
       setActiveTab('explorer');
       handleSearch(query || 'recent advances', 'hybrid', 0);
@@ -232,6 +243,7 @@ export default function App() {
   };
 
   const handleAddGeneratedTask = (todo) => {
+    setCopilotOpen(false);
     setTasks(prev => [{
       id: `task_${Date.now()}`,
       text: todo.text,
@@ -244,24 +256,8 @@ export default function App() {
   };
 
   const handleAddPaperToCanvas = (paper) => {
-    const elementsKey = scopedKey('srw_canvas_elements_v4', activeProjectId);
-    const elems = readArray(elementsKey);
-    const newNode = {
-      id: `paper_${paper.id || Date.now()}`,
-      type: 'paper',
-      title: paper.title,
-      text: paper.matching_snippet || paper.abstract || '',
-      authors: paper.authors || '',
-      venue: paper.venue || 'ArXiv',
-      year: paper.publication_year || 2024,
-      paperData: paper,
-      x: 140 + (elems.length % 5) * 35,
-      y: 140 + (elems.length % 5) * 28,
-      width: 255, height: 150,
-      bgColor: '#ffffff', textColor: '#0f172a'
-    };
-    localStorage.setItem(elementsKey, JSON.stringify([...elems, newNode]));
-    setCanvasStats(getCanvasStats(activeProjectId));
+    setCopilotOpen(false);
+    setCanvasPaperRequest({ id: Date.now(), projectId: activeProjectId, paper });
     setActiveTab('canvas');
   };
 
@@ -423,9 +419,10 @@ export default function App() {
                 <ResearchCanvas
                   key={activeProjectId}
                   projectId={activeProjectId}
+                  addPaperRequest={canvasPaperRequest}
                   libraryPapers={libraryPapers}
                   onInspectPaper={handleInspectPaper}
-                  onCanvasChange={() => setCanvasStats(getCanvasStats())}
+                  onCanvasChange={handleCanvasChange}
                 />
               </div>
 
@@ -584,6 +581,8 @@ export default function App() {
                 onTriggerTool={handleTriggerCopilotTool}
                 onAddGeneratedTask={handleAddGeneratedTask}
                 onAddPaperToCanvas={handleAddPaperToCanvas}
+                projectId={activeProjectId}
+                projectName={selectedProject}
               />
             </>
           )}
