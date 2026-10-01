@@ -46,7 +46,7 @@ export default function SynthesisView({ selectedPapers, onRemovePaper, onInspect
       {/* Matrix Controls */}
       <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Cpu size={20} color="var(--accent-purple)" />
             Multi-Paper Synthesis Matrix ({selectedPapers.length} Selected)
           </h2>
@@ -69,18 +69,18 @@ export default function SynthesisView({ selectedPapers, onRemovePaper, onInspect
       {/* Generated AI Executive Summary Banner */}
       {synthesisResult && (
         <div className="glass-panel animate-fade-in" style={{ padding: '24px', marginBottom: '28px', borderLeft: '4px solid var(--accent-purple)' }}>
-          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#fff', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <FileText size={18} color="var(--accent-purple)" />
             Executive Synthesis Overview
           </h3>
-          <p style={{ fontSize: '0.92rem', color: '#e2e8f0', marginBottom: '14px', lineHeight: 1.6 }}>
+          <p style={{ fontSize: '0.92rem', color: '#334155', marginBottom: '14px', lineHeight: 1.6 }}>
             {synthesisResult.executive_summary}
           </p>
 
           <h4 style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>
             Key Comparative Insights:
           </h4>
-          <ul style={{ paddingLeft: '20px', fontSize: '0.88rem', color: '#cbd5e1' }}>
+          <ul style={{ paddingLeft: '20px', fontSize: '0.88rem', color: '#475569' }}>
             {synthesisResult.key_insights.map((insight, i) => (
               <li key={i} style={{ marginBottom: '6px' }}>{insight}</li>
             ))}
@@ -95,7 +95,7 @@ export default function SynthesisView({ selectedPapers, onRemovePaper, onInspect
             <div>
               {/* Header */}
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', background: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '2px 8px', borderRadius: '6px', background: '#f5f3ff', color: '#6d28d9', border: '1px solid #ddd6fe' }}>
                   {paper.publication_year || 'Year N/A'}
                 </span>
 
@@ -112,7 +112,7 @@ export default function SynthesisView({ selectedPapers, onRemovePaper, onInspect
               {/* Title */}
               <h4
                 onClick={() => onInspectPaper(paper)}
-                style={{ fontSize: '1rem', fontWeight: 600, color: '#fff', marginBottom: '10px', cursor: 'pointer', lineHeight: 1.35 }}
+                style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '10px', cursor: 'pointer', lineHeight: 1.35 }}
               >
                 {paper.title}
               </h4>

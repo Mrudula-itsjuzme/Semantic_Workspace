@@ -55,7 +55,7 @@ export default function AiAssistant({ papers }) {
           <Sparkles size={20} color="#fff" />
         </div>
         <div>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#fff' }}>Semantic RAG Assistant</h2>
+          <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-main)' }}>Semantic RAG Assistant</h2>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
             Grounded Q&A powered by fastembed vector chunk retrieval
           </p>
@@ -70,11 +70,11 @@ export default function AiAssistant({ papers }) {
             style={{
               alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start',
               maxWidth: msg.sender === 'user' ? '80%' : '90%',
-              background: msg.sender === 'user' ? 'linear-gradient(135deg, var(--primary), var(--primary-hover))' : 'rgba(15, 23, 42, 0.7)',
+              background: msg.sender === 'user' ? 'linear-gradient(135deg, var(--primary), var(--primary-hover))' : '#f4f7fb',
               border: msg.sender === 'user' ? 'none' : '1px solid var(--border-color)',
               padding: '16px 20px',
               borderRadius: msg.sender === 'user' ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-              color: '#ffffff',
+              color: msg.sender === 'user' ? '#ffffff' : 'var(--text-main)',
               fontSize: '0.92rem',
               lineHeight: 1.6
             }}
@@ -83,14 +83,14 @@ export default function AiAssistant({ papers }) {
 
             {/* Render Context Citations */}
             {msg.citations && msg.citations.length > 0 && (
-              <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+              <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-cyan)', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
                   Retrieved Vector Context Citations:
                 </span>
                 {msg.citations.map((c, ci) => (
-                  <div key={ci} style={{ background: 'rgba(0, 0, 0, 0.3)', padding: '8px 12px', borderRadius: '8px', marginBottom: '6px', fontSize: '0.8rem' }}>
-                    <div style={{ fontWeight: 600, color: '#a5b4fc', marginBottom: '2px' }}>
-                      "{c.title}" ({c.year || 'N/A'}) — <span style={{ color: '#34d399' }}>{c.score != null ? `${c.score}% Relevance` : (c.relevance_score != null ? `${c.relevance_score}% Relevance` : '')}</span>
+                  <div key={ci} style={{ background: '#ffffff', border: '1px solid var(--border-color)', padding: '8px 12px', borderRadius: '8px', marginBottom: '6px', fontSize: '0.8rem' }}>
+                    <div style={{ fontWeight: 600, color: '#4338ca', marginBottom: '2px' }}>
+                      "{c.title}" ({c.year || 'N/A'}) — <span style={{ color: '#15803d' }}>{c.score != null ? `${c.score}% Relevance` : (c.relevance_score != null ? `${c.relevance_score}% Relevance` : '')}</span>
                     </div>
                     <div style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>
                       "{c.snippet}"

@@ -47,7 +47,7 @@ export default function LibraryView({ papers, onInspectPaper, onDeletePaper, onR
       {/* Header */}
       <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Database size={20} color="var(--accent-cyan)" />
             Workspace Vector Library ({papers ? papers.length : 0} Papers Ingested)
           </h2>
@@ -66,7 +66,7 @@ export default function LibraryView({ papers, onInspectPaper, onDeletePaper, onR
       <div className="glass-panel" style={{ overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
           <thead>
-            <tr style={{ background: 'rgba(255, 255, 255, 0.04)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase' }}>
+            <tr style={{ background: '#f6f8fb', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.78rem', textTransform: 'uppercase' }}>
               <th style={{ padding: '14px 20px' }}>Title & DOI</th>
               <th style={{ padding: '14px 20px' }}>Year</th>
               <th style={{ padding: '14px 20px' }}>Ingestion</th>
@@ -78,12 +78,12 @@ export default function LibraryView({ papers, onInspectPaper, onDeletePaper, onR
             {papers && papers.map((paper) => (
               <tr
                 key={paper.id}
-                style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', transition: 'background 0.15s ease' }}
-                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)'}
+                style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.15s ease' }}
+                onMouseOver={(e) => e.currentTarget.style.background = '#f8fafc'}
                 onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
               >
                 <td style={{ padding: '14px 20px' }}>
-                  <div style={{ fontWeight: 600, color: '#fff', cursor: 'pointer', marginBottom: '4px' }} onClick={() => onInspectPaper(paper)}>
+                  <div style={{ fontWeight: 600, color: 'var(--text-main)', cursor: 'pointer', marginBottom: '4px' }} onClick={() => onInspectPaper(paper)}>
                     {paper.title}
                   </div>
                   {paper.doi && (
@@ -106,7 +106,7 @@ export default function LibraryView({ papers, onInspectPaper, onDeletePaper, onR
                           {meta.label}
                         </span>
                         {paper.ingestion_error && (
-                          <span style={{ fontSize: '0.7rem', color: '#fca5a5', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={paper.ingestion_error}>
+                        <span style={{ fontSize: '0.7rem', color: '#b42318', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={paper.ingestion_error}>
                             {paper.ingestion_error}
                           </span>
                         )}
@@ -135,7 +135,7 @@ export default function LibraryView({ papers, onInspectPaper, onDeletePaper, onR
                       <button
                         className="btn-secondary"
                         onClick={() => handleRetry(paper)}
-                        style={{ padding: '4px 10px', fontSize: '0.75rem', color: '#fca5a5' }}
+                        style={{ padding: '4px 10px', fontSize: '0.75rem', color: '#b42318' }}
                       >
                         <RefreshCw size={12} />
                         Retry

@@ -78,7 +78,7 @@ export default function GraphExplorer({ onInspectPaper }) {
     <div className="glass-panel" style={{ padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#fff', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', gap: '8px', alignItems: 'center' }}>
             <Network size={20} color="var(--accent-cyan)" /> Knowledge Graph
           </h2>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
@@ -90,7 +90,7 @@ export default function GraphExplorer({ onInspectPaper }) {
         </button>
       </div>
 
-      <div style={{ background: 'rgba(5,8,15,0.7)', borderRadius: '14px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+      <div style={{ background: '#f8fafc', borderRadius: '14px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
         <svg width="100%" height="520" viewBox="0 0 700 520">
           {edges.map((e, i) => {
             const a = posById[e.source];
@@ -100,7 +100,7 @@ export default function GraphExplorer({ onInspectPaper }) {
               <line
                 key={i}
                 x1={a.cx} y1={a.cy} x2={b.cx} y2={b.cy}
-                stroke={e.type === 'CITES' ? 'rgba(52, 211, 153, 0.28)' : 'rgba(165, 180, 252, 0.22)'}
+                stroke={e.type === 'CITES' ? 'rgba(5, 150, 105, 0.35)' : 'rgba(99, 102, 241, 0.32)'}
                 strokeWidth={e.type === 'CITES' ? 1.4 : 1}
               />
             );
@@ -111,11 +111,11 @@ export default function GraphExplorer({ onInspectPaper }) {
               onClick={() => onInspectPaper && onInspectPaper({ id: n.id, title: n.title, publication_year: n.year })}
               style={{ cursor: 'pointer' }}
             >
-              <circle cx={n.cx} cy={n.cy} r={14} fill="rgba(17,24,39,0.92)" stroke="#34d399" strokeWidth={1.6} />
-              <text x={n.cx} y={n.cy + 3.5} textAnchor="middle" fill="#fff" fontSize="8.5" fontWeight="bold">
+              <circle cx={n.cx} cy={n.cy} r={14} fill="#e8f5ef" stroke="#15966b" strokeWidth={1.6} />
+              <text x={n.cx} y={n.cy + 3.5} textAnchor="middle" fill="#14532d" fontSize="8.5" fontWeight="bold">
                 {n.id}
               </text>
-              <text x={n.cx} y={n.cy + 26} textAnchor="middle" fill="var(--text-muted)" fontSize="9.5">
+              <text x={n.cx} y={n.cy + 26} textAnchor="middle" fill="#475569" fontSize="9.5">
                 {(n.title || '').slice(0, 22)}{(n.title || '').length > 22 ? '…' : ''}
               </text>
             </g>
