@@ -415,7 +415,7 @@ export default function App() {
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', gap: '10px' }}>
 
               {/* Whiteboard */}
-              <div style={{ flex: 1, minHeight: 0 }}>
+              <div className="workspace-canvas-host">
                 <ResearchCanvas
                   key={activeProjectId}
                   projectId={activeProjectId}

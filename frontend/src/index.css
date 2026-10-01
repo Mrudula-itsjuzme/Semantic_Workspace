@@ -148,6 +148,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   position: relative;
 }
 .workspace-main { background: var(--bg-app); min-width: 0; min-height: 0; }
+.workspace-canvas-host { flex: 1 1 0; min-width: 0; min-height: 320px; display: flex; overflow: hidden; }
+.workspace-canvas-host > .research-canvas { width: 100%; height: 100%; min-height: 0; }
 .workspace-sidebar {
   width: 252px;
   flex: 0 0 252px;
@@ -268,11 +270,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   background: #fffefa !important;
   box-shadow: 0 3px 12px rgba(16,33,63,.06);
 }
-.research-canvas > div[style*="backgroundImage"] {
-  background-image: radial-gradient(#d9d1c5 1px, transparent 1px) !important;
-  background-size: 22px 22px !important;
-  opacity: .42 !important;
-}
 .research-canvas button:hover { filter: brightness(.98); }
 .canvas-toolbar {
   width: max-content;
@@ -287,6 +284,20 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .canvas-tool-button { min-height: 42px; white-space: nowrap; }
 .canvas-tool-button:hover { background: #f2f0ea !important; color: #355f53 !important; }
 .canvas-tool-button.is-active:hover { background: #e6f0eb !important; }
+.canvas-utility-button {
+  width: 31px; height: 31px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid #e6e0d7; border-radius: 8px; color: #536176; background: #fffefa; cursor: pointer;
+}
+.canvas-utility-button:hover:not(:disabled) { color: #38685c; background: #e6f0eb; }
+.canvas-utility-button:disabled { opacity: .38; cursor: default; }
+.canvas-zoom-control { display: flex; align-items: center; gap: 5px; padding-left: 7px; border-left: 1px solid #e6e0d7; color: #536176; font-size: .72rem; font-weight: 650; }
+.canvas-paper-search {
+  display: flex; align-items: center; gap: 9px; margin-bottom: 12px; padding: 9px 11px;
+  border: 1px solid #e6e0d7; border-radius: 9px; color: #788598; background: #fffefa;
+}
+.canvas-paper-search:focus-within { border-color: #8ba99d; box-shadow: 0 0 0 3px rgba(71,121,109,.12); }
+.canvas-paper-search input { width: 100%; min-width: 0; border: 0; outline: 0; color: #192638; background: transparent; font-size: .82rem; }
+.canvas-paper-search input::placeholder { color: #8993a2; }
 .canvas-empty-state { width: min(480px, calc(100% - 32px)); }
 .canvas-empty-mark {
   width: 50px; height: 50px; margin: 0 auto 14px; display: grid; place-items: center;

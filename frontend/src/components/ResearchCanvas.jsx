@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   MousePointer, StickyNote, Type, PenTool, Highlighter, Square,
-  ArrowUpRight, FileText, Trash2, Sparkles, X, Bold, Italic 
+  ArrowUpRight, FileText, Trash2, Sparkles, X, Bold, Italic, Undo2, Redo2, ZoomIn, ZoomOut, Maximize2, Eraser, Search
 } from 'lucide-react';
 
 const DEFAULT_PROJECT_ID = 'workspace-default';
@@ -32,6 +32,8 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
 
   // Connections state
   const [connections, setConnections] = useState(() => readStoredItems(connectionsKey));
+  const [zoom, setZoom] = useState(100);
+  const [, setHistoryVersion] = useState(0);
 
   // Active Tool: 'select' | 'sticky' | 'text' | 'draw' | 'highlight' | 'shape' | 'arrow' | 'paper'
   const [activeTool, setActiveTool] = useState('select');
@@ -56,11 +58,13 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
 
   // Modal for paper insertion
   const [showPaperModal, setShowPaperModal] = useState(false);
+  const [paperFilter, setPaperFilter] = useState('');
 
   const containerRef = useRef(null);
   const drawingCanvasRef = useRef(null);
   const activeInputRef = useRef(null);
   const processedPaperRequest = useRef(null);
+  const historyRef = useRef({ past: [], future: [], snapshot: null, isDragging: false, dragStart: null });
   const [drawingSurfaceSize, setDrawingSurfaceSize] = useState({ width: 0, height: 0 });
 
   // Save to localStorage
@@ -79,6 +83,46 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
     onCanvasChange?.();
   }, [connections, connectionsKey, onCanvasChange]);
 
+  // Keep a bounded history for reversible canvas edits.
+  useEffect(() => {
+    const snapshot = JSON.stringify({ elements, drawings, connections });
+    const history = historyRef.current;
+    if (history.snapshot === null) {
+      history.snapshot = snapshot;
+      return;
+    }
+    if (history.snapshot === snapshot) return;
+    if (history.isDragging) {
+      history.snapshot = snapshot;
+      return;
+    }
+    history.past.push(history.snapshot);
+    if (history.past.length > 60) history.past.shift();
+    history.future = [];
+    history.snapshot = snapshot;
+    setHistoryVersion(version => version + 1);
+  }, [elements, drawings, connections]);
+
+  const applyHistorySnapshot = useCallback((direction) => {
+    const history = historyRef.current;
+    const source = direction === 'undo' ? history.past : history.future;
+    if (!source.length) return;
+    const destination = direction === 'undo' ? history.future : history.past;
+    destination.push(JSON.stringify({ elements, drawings, connections }));
+    const snapshot = source.pop();
+    const restored = JSON.parse(snapshot);
+    history.snapshot = snapshot;
+    setElements(restored.elements);
+    setDrawings(restored.drawings);
+    setConnections(restored.connections);
+    setSelectedElementId(null);
+    setEditingElementId(null);
+    setHistoryVersion(version => version + 1);
+  }, [elements, drawings, connections]);
+
+  const undo = useCallback(() => applyHistorySnapshot('undo'), [applyHistorySnapshot]);
+  const redo = useCallback(() => applyHistorySnapshot('redo'), [applyHistorySnapshot]);
+
   useEffect(() => {
     const canvas = drawingCanvasRef.current;
     if (!canvas) return undefined;
@@ -86,8 +130,8 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
     const resizeSurface = () => {
       const rect = canvas.getBoundingClientRect();
       const pixelRatio = window.devicePixelRatio || 1;
-      canvas.width = Math.max(1, Math.round(rect.width * pixelRatio));
-      canvas.height = Math.max(1, Math.round(rect.height * pixelRatio));
+      canvas.width = Math.max(1, Math.round(canvas.clientWidth * pixelRatio));
+      canvas.height = Math.max(1, Math.round(canvas.clientHeight * pixelRatio));
       canvas.getContext('2d')?.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
       setDrawingSurfaceSize({ width: rect.width, height: rect.height });
     };
@@ -102,13 +146,28 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
   useEffect(() => {
     if (editingElementId && activeInputRef.current) {
       activeInputRef.current.focus();
+      if (['New Sticky Note', 'Type text here...'].includes(activeInputRef.current.value)) {
+        activeInputRef.current.select();
+      }
     }
   }, [editingElementId]);
 
   // Global Keyboard Shortcuts (Delete, Escape)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable || e.altKey) return;
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+        return;
+      }
       
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedElementId) {
@@ -129,7 +188,7 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedElementId]);
+  }, [selectedElementId, undo, redo]);
 
   // Redraw freehand paths on HTML5 canvas overlay
   useEffect(() => {
@@ -233,6 +292,21 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
     if (activeTool !== 'select') setActiveTool('select');
   };
 
+  const clampElementPosition = (x, y, width = 220, height = 140) => {
+    const bounds = containerRef.current?.getBoundingClientRect();
+    const scale = zoom / 100;
+    return {
+      x: Math.min(Math.max(8, x), Math.max(8, ((bounds?.width || width) / scale) - width - 8)),
+      y: Math.min(Math.max(8, y), Math.max(8, ((bounds?.height || height) / scale) - height - 8))
+    };
+  };
+
+  const canvasPoint = (clientX, clientY) => {
+    const rect = containerRef.current.getBoundingClientRect();
+    const scale = zoom / 100;
+    return { x: (clientX - rect.left) / scale, y: (clientY - rect.top) / scale };
+  };
+
   // Canvas Click Handler
   const handleCanvasClick = (e) => {
     // If clicked on an existing element, let element handler process it
@@ -240,12 +314,14 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
     
     if (activeTool === 'draw' || activeTool === 'highlight') return;
 
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = Math.max(10, e.clientX - rect.left - 60);
-    const y = Math.max(10, e.clientY - rect.top - 20);
+    const point = canvasPoint(e.clientX, e.clientY);
+    const x = point.x - 60;
+    const y = point.y - 20;
 
     if (activeTool === 'sticky' || activeTool === 'text' || activeTool === 'shape') {
-      spawnElementAtCoordinates(x, y);
+      const [width, height] = activeTool === 'sticky' ? [190, 140] : activeTool === 'shape' ? [170, 90] : [220, 50];
+      const position = clampElementPosition(x, y, width, height);
+      spawnElementAtCoordinates(position.x, position.y);
     } else {
       // In Select Mode, clicking background deselects active element
       setSelectedElementId(null);
@@ -256,9 +332,10 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
   // DOUBLE CLICK ANYWHERE ON CANVAS GRID -> Spawn Typable Text Box Immediately!
   const handleCanvasDoubleClick = (e) => {
     if (e.target.closest('.canvas-element')) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = Math.max(10, e.clientX - rect.left - 40);
-    const y = Math.max(10, e.clientY - rect.top - 15);
+    const point = canvasPoint(e.clientX, e.clientY);
+    const position = clampElementPosition(point.x - 40, point.y - 15, 220, 50);
+    const x = position.x;
+    const y = position.y;
     spawnElementAtCoordinates(x, y, 'text');
   };
 
@@ -266,35 +343,38 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
   const handleMouseDownCanvas = (e) => {
     if (activeTool === 'draw' || activeTool === 'highlight') {
       setIsDrawing(true);
-      const rect = containerRef.current.getBoundingClientRect();
-      const pt = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      const pt = canvasPoint(e.clientX, e.clientY);
       setCurrentPath([pt]);
     }
   };
 
   const handleMouseMoveCanvas = (e) => {
-    const rect = containerRef.current.getBoundingClientRect();
-
     if (isDrawing && (activeTool === 'draw' || activeTool === 'highlight')) {
-      const pt = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      const pt = canvasPoint(e.clientX, e.clientY);
       setCurrentPath(prev => [...prev, pt]);
       return;
     }
 
     if (draggedId) {
-      const newX = Math.max(10, e.clientX - rect.left - dragOffset.x);
-      const newY = Math.max(10, e.clientY - rect.top - dragOffset.y);
+      const draggedElement = elements.find(el => el.id === draggedId);
+      const point = canvasPoint(e.clientX, e.clientY);
+      const position = clampElementPosition(
+        point.x - dragOffset.x,
+        point.y - dragOffset.y,
+        draggedElement?.width || 220,
+        draggedElement?.height || 50
+      );
 
       setElements(prev => prev.map(el => {
         if (el.id === draggedId) {
-          return { ...el, x: newX, y: newY };
+          return { ...el, x: position.x, y: position.y };
         }
         return el;
       }));
     }
   };
 
-  const handleMouseUpCanvas = () => {
+  const handleMouseUpCanvas = useCallback(() => {
     if (isDrawing) {
       setIsDrawing(false);
       if (currentPath.length >= 2) {
@@ -312,7 +392,29 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
       setCurrentPath([]);
     }
     setDraggedId(null);
-  };
+  }, [isDrawing, currentPath, brushColor, activeTool, brushSize]);
+
+  useEffect(() => {
+    const finishPointerAction = () => {
+      if (isDrawing) handleMouseUpCanvas();
+      if (draggedId) {
+        const history = historyRef.current;
+        const snapshot = JSON.stringify({ elements, drawings, connections });
+        if (history.dragStart && history.dragStart !== snapshot) {
+          history.past.push(history.dragStart);
+          if (history.past.length > 60) history.past.shift();
+          history.future = [];
+          history.snapshot = snapshot;
+          setHistoryVersion(version => version + 1);
+        }
+        history.isDragging = false;
+        history.dragStart = null;
+        setDraggedId(null);
+      }
+    };
+    window.addEventListener('mouseup', finishPointerAction);
+    return () => window.removeEventListener('mouseup', finishPointerAction);
+  }, [isDrawing, draggedId, handleMouseUpCanvas, elements, drawings, connections]);
 
   // Element Selection & Dragging Handlers
   const handleElementMouseDown = (e, elemId) => {
@@ -334,11 +436,13 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
     if (activeTool === 'select') {
       const elem = elements.find(el => el.id === elemId);
       if (elem) {
+        historyRef.current.isDragging = true;
+        historyRef.current.dragStart = JSON.stringify({ elements, drawings, connections });
         setDraggedId(elemId);
-        const rect = containerRef.current.getBoundingClientRect();
+        const point = canvasPoint(e.clientX, e.clientY);
         setDragOffset({
-          x: e.clientX - rect.left - elem.x,
-          y: e.clientY - rect.top - elem.y
+          x: point.x - elem.x,
+          y: point.y - elem.y
         });
       }
     }
@@ -421,6 +525,11 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
   }, [addPaperRequest, projectId, handleInsertPaperCard]);
 
   const selectedElement = elements.find(el => el.id === selectedElementId);
+  const filteredLibraryPapers = (libraryPapers || []).filter(paper => {
+    const authors = Array.isArray(paper.authors) ? paper.authors : [];
+    const searchable = `${paper.title || ''} ${paper.publication_year || ''} ${authors.map(author => typeof author === 'string' ? author : author?.name || '').join(' ')}`;
+    return searchable.toLowerCase().includes(paperFilter.trim().toLowerCase());
+  });
 
   return (
     <div
@@ -429,7 +538,6 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
       onDoubleClick={handleCanvasDoubleClick}
       onMouseDown={handleMouseDownCanvas}
       onMouseMove={handleMouseMoveCanvas}
-      onMouseUp={handleMouseUpCanvas}
       className="research-canvas"
       style={{
         flex: 1,
@@ -482,6 +590,13 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
         >
           <MousePointer size={16} />
           <span>Select</span>
+        </button>
+
+          <button type="button" className="canvas-utility-button" onClick={undo} disabled={!historyRef.current.past.length} title="Undo (Ctrl/⌘ Z)" aria-label="Undo canvas change">
+          <Undo2 size={16} />
+        </button>
+        <button type="button" className="canvas-utility-button" onClick={redo} disabled={!historyRef.current.future.length} title="Redo (Ctrl/⌘ Shift Z)" aria-label="Redo canvas change">
+          <Redo2 size={16} />
         </button>
 
         <div style={{ width: '1px', height: '20px', background: '#e2e8f0' }} />
@@ -585,7 +700,7 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
         {/* Insert Paper Tool */}
         <button
           className="canvas-tool-button canvas-insert-paper"
-          onClick={() => setShowPaperModal(true)}
+          onClick={() => { setPaperFilter(''); setShowPaperModal(true); }}
           style={{
             padding: '8px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: 600,
             background: '#fae8df', color: '#99563e'
@@ -623,14 +738,29 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
         >
           <Trash2 size={16} />
         </button>
+        <button
+          className="canvas-utility-button"
+          onClick={() => setDrawings([])}
+          disabled={drawings.length === 0}
+          title="Clear drawings"
+          aria-label="Clear drawings"
+        >
+          <Eraser size={15} />
+        </button>
+        <div className="canvas-zoom-control" aria-label={`Canvas zoom ${zoom}%`}>
+          <button className="canvas-utility-button" onClick={() => setZoom(value => Math.max(50, value - 10))} title="Zoom out" aria-label="Zoom out"><ZoomOut size={15} /></button>
+          <span>{zoom}%</span>
+          <button className="canvas-utility-button" onClick={() => setZoom(value => Math.min(150, value + 10))} title="Zoom in" aria-label="Zoom in"><ZoomIn size={15} /></button>
+          <button className="canvas-utility-button" onClick={() => setZoom(100)} title="Reset zoom" aria-label="Reset zoom"><Maximize2 size={14} /></button>
+        </div>
       </div>
 
       {/* CONTEXTUAL FLOATING FORMATTING BAR (Positioned Directly Above Active Element) */}
       {selectedElement && activeTool === 'select' && (
         <div style={{
           position: 'absolute',
-          left: `${Math.max(10, selectedElement.x)}px`,
-          top: `${Math.max(10, selectedElement.y - 48)}px`,
+          left: `${Math.max(10, selectedElement.x * zoom / 100)}px`,
+          top: `${Math.max(10, selectedElement.y * zoom / 100 - 48)}px`,
           zIndex: 50,
           background: '#ffffff',
           border: '1px solid #cbd5e1',
@@ -722,14 +852,14 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
       <canvas
         ref={drawingCanvasRef}
         style={{
-          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', transform: `scale(${zoom / 100})`, transformOrigin: 'top left',
           pointerEvents: activeTool === 'draw' || activeTool === 'highlight' ? 'auto' : 'none',
           zIndex: 15
         }}
       />
 
       {/* SVG CONNECTOR LINES OVERLAY */}
-      <svg style={{ position: 'absolute', width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10 }}>
+      <svg style={{ position: 'absolute', width: '100%', height: '100%', transform: `scale(${zoom / 100})`, transformOrigin: 'top left', pointerEvents: 'none', zIndex: 10 }}>
         <defs>
           <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
             <polygon points="0 0, 8 4, 0 8" fill="#475569" />
@@ -777,20 +907,20 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
           <div className="canvas-empty-actions">
             <button className="canvas-start-button" onClick={(event) => {
               event.stopPropagation();
-              spawnElementAtCoordinates(containerRef.current.clientWidth / 2 - 95, containerRef.current.clientHeight / 2 - 60, 'sticky');
+              spawnElementAtCoordinates(containerRef.current.clientWidth / (2 * zoom / 100) - 95, containerRef.current.clientHeight / (2 * zoom / 100) - 60, 'sticky');
             }}>
               <StickyNote size={16} /> Start with a note
             </button>
-            <button className="canvas-paper-button" onClick={(event) => { event.stopPropagation(); setShowPaperModal(true); }}>
+            <button className="canvas-paper-button" onClick={(event) => { event.stopPropagation(); setPaperFilter(''); setShowPaperModal(true); }}>
               <FileText size={16} /> Add a paper
             </button>
           </div>
-          <p className="canvas-shortcut-note">Double-click to add text · N note · T text · D draw · V select</p>
+          <p className="canvas-shortcut-note">Double-click to add text · N note · T text · D draw · V select · Ctrl/⌘ Z undo</p>
         </div>
       )}
 
       {/* RENDER DRAGGABLE & TYPABLE ELEMENTS */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 20, pointerEvents: 'none' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 20, pointerEvents: 'none', transform: `scale(${zoom / 100})`, transformOrigin: 'top left' }}>
         {elements.map((el) => {
           const isSelected = selectedElementId === el.id;
           const isEditing = editingElementId === el.id;
@@ -887,9 +1017,20 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
               <button onClick={() => setShowPaperModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={18} color="#64748b" /></button>
             </div>
 
+            <label className="canvas-paper-search">
+              <Search size={16} aria-hidden="true" />
+              <input
+                autoFocus
+                type="search"
+                placeholder="Find a saved paper by title, author, or year"
+                value={paperFilter}
+                onChange={(event) => setPaperFilter(event.target.value)}
+              />
+            </label>
+
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {libraryPapers && libraryPapers.length > 0 ? (
-                libraryPapers.map((p) => (
+              {filteredLibraryPapers.length > 0 ? (
+                filteredLibraryPapers.map((p) => (
                   <div
                     key={p.id}
                     onClick={() => handleInsertPaperCard(p)}
@@ -903,7 +1044,7 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper, onCanvas
                 ))
               ) : (
                 <p style={{ fontSize: '0.88rem', color: '#64748b', textAlign: 'center', padding: '20px' }}>
-                  No papers found in your workspace library. Search for papers in the Literature Search tab to ingest them!
+                  {paperFilter.trim() ? 'No saved papers match that search.' : 'No papers found in your workspace library. Search for papers in the Literature Search tab to ingest them!'}
                 </p>
               )}
             </div>
