@@ -24,7 +24,7 @@ export default function Sidebar({ activeTab, setActiveTab, stats, taskCount }) {
   const dbStatus    = stats?.database === 'connected';
 
   return (
-    <aside style={{
+    <aside className="workspace-sidebar" style={{
       width: '208px',
       background: 'var(--bg-sidebar)',
       borderRight: '1px solid var(--border-color)',
@@ -44,7 +44,7 @@ export default function Sidebar({ activeTab, setActiveTab, stats, taskCount }) {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
           return (
-            <button
+            <button className={`workspace-nav-item ${isActive ? 'is-active' : ''}`}
               key={item.id}
               onClick={() => setActiveTab(item.id)}
               style={{

@@ -29,7 +29,7 @@ export default function CopilotSidebar({ onTriggerTool, onAddGeneratedTask, onAd
   };
 
   return (
-    <aside style={{ width: '310px', background: '#ffffff', borderLeft: '1px solid #e2e8f0', padding: '20px 16px', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+    <aside className="research-rail" style={{ width: '310px', background: '#ffffff', borderLeft: '1px solid #e2e8f0', padding: '20px 16px', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
       {/* Copilot Header */}
       <div style={{ marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>

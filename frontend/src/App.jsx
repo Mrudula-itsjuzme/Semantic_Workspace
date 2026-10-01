@@ -310,7 +310,7 @@ export default function App() {
   ];
 
   return (
-    <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', background: 'var(--bg-app)', overflow: 'hidden' }}>
+    <div className="app-shell" style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', background: 'var(--bg-app)', overflow: 'hidden' }}>
 
       {/* ── Header ── */}
       <Header
@@ -325,7 +325,7 @@ export default function App() {
       />
 
       {/* ── Body row ── */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div className="app-body" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
         {/* Left Sidebar */}
         <Sidebar
@@ -336,7 +336,7 @@ export default function App() {
         />
 
         {/* ── Center ── */}
-        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '14px', overflow: 'hidden', gap: '12px' }}>
+        <main className="workspace-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '14px', overflow: 'hidden', gap: '12px' }}>
 
           {/* === Canvas Tab === */}
           {(activeTab === 'canvas' || activeTab === 'workspace') && (

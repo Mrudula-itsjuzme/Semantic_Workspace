@@ -28,35 +28,35 @@ export default function Header({
   };
 
   return (
-    <header style={{
+    <header className="app-header" style={{
       background: '#ffffff',
       borderBottom: '1px solid var(--border-color)',
       zIndex: 30,
       flexShrink: 0,
     }}>
-      <div style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div className="app-header__inner" style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
 
         {/* Brand */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '9px', flexShrink: 0 }}>
-          <div style={{
+          <div className="brand-mark" style={{
             width: '30px', height: '30px', borderRadius: '8px',
-            background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
+            background: '#155eef',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(37,99,235,0.3)'
+            boxShadow: '0 3px 10px rgba(21,94,239,0.28)'
           }}>
             <FlaskConical size={16} color="#ffffff" />
           </div>
           <div>
             <span style={{ fontSize: '0.92rem', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', display: 'block', lineHeight: 1.1 }}>
-              Semantic RW
+              Semantic Research
             </span>
             <span style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 500 }}>
-              Research Workspace
+              Workspace
             </span>
           </div>
         </div>
 
-        <div style={{ width: '1px', height: '28px', background: 'var(--border-color)', flexShrink: 0 }} />
+        <div className="header-divider" style={{ width: '1px', height: '28px', background: 'var(--border-color)', flexShrink: 0 }} />
 
         {/* Project Selector — renameable, persisted in localStorage by App */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -86,7 +86,7 @@ export default function Header({
               </button>
             </div>
           ) : (
-          <button
+          <button className="project-switcher"
             onClick={() => setShowProjectMenu(v => !v)}
             style={{
               display: 'flex', alignItems: 'center', gap: '6px',
@@ -139,7 +139,7 @@ export default function Header({
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
           <div style={{ position: 'relative', flex: 1 }}>
             <Search size={15} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-            <input
+            <input className="header-search-input"
               type="text"
               placeholder="Search papers, methods, datasets… ⌘K"
               value={query}
@@ -159,7 +159,7 @@ export default function Header({
 
           <div style={{ position: 'relative', flex: 1 }}>
             <Sparkles size={15} color="#2563eb" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-            <input
+            <input className="header-assistant-input"
               type="text"
               placeholder="Ask your research assistant…"
               value={askQuery}

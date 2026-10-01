@@ -384,6 +384,7 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
       onMouseDown={handleMouseDownCanvas}
       onMouseMove={handleMouseMoveCanvas}
       onMouseUp={handleMouseUpCanvas}
+      className="research-canvas"
       style={{
         flex: 1,
         background: '#f8fafc',
