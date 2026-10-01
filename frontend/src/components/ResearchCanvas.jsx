@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  MousePointer, StickyNote, Type, PenTool, Highlighter, Square, Circle, 
-  ArrowUpRight, FileText, Plus, Trash2, Sparkles, X, Check, Bold, Italic, Type as FontIcon 
+  MousePointer, StickyNote, Type, PenTool, Highlighter, Square,
+  ArrowUpRight, FileText, Trash2, Sparkles, X, Bold, Italic 
 } from 'lucide-react';
 
 export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
@@ -29,7 +29,7 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
 
   // Drawing settings
   const [brushColor, setBrushColor] = useState('#2563eb');
-  const [brushSize, setBrushSize] = useState(3);
+  const [brushSize] = useState(3);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPath, setCurrentPath] = useState([]);
 
@@ -90,6 +90,7 @@ export default function ResearchCanvas({ libraryPapers, onInspectPaper }) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedElementId]);
 
   // Redraw freehand paths on HTML5 canvas overlay

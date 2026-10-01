@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Search, Bell, ChevronDown, User, FlaskConical, Pencil, Check } from 'lucide-react';
+import { Sparkles, Search, Bell, ChevronDown, FlaskConical, Pencil, Check } from 'lucide-react';
 
 export default function Header({
   projects,

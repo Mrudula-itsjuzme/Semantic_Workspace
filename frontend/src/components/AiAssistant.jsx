@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Sparkles, Send, BookOpen, Quote, HelpCircle } from 'lucide-react';
+import { Sparkles, Send } from 'lucide-react';
 import axios from 'axios';
 import { apiUrl } from '../api';
 
-export default function AiAssistant({ papers }) {
+export default function AiAssistant() {
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState([
     {
