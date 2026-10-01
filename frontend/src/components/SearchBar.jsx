@@ -85,14 +85,14 @@ export default function SearchBar({
                   padding: '6px 14px',
                   borderRadius: '20px',
                   border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                  background: isSelected ? 'rgba(99, 102, 241, 0.18)' : 'rgba(255, 255, 255, 0.03)',
-                  color: isSelected ? '#a5b4fc' : 'var(--text-muted)',
+                  background: isSelected ? '#eaf1ff' : '#ffffff',
+                  color: isSelected ? '#124bb8' : 'var(--text-muted)',
                   fontSize: '0.82rem',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease'
                 }}
               >
-                <Icon size={14} color={isSelected ? '#6366f1' : 'var(--text-muted)'} />
+                <Icon size={14} color={isSelected ? '#155eef' : 'var(--text-muted)'} />
                 <span>{m.label}</span>
               </button>
             );
@@ -103,7 +103,7 @@ export default function SearchBar({
         {searchMode === 'vector' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
             <Filter size={14} />
-            <span>Min Similarity: <strong style={{ color: '#fff' }}>{minScore}%</strong></span>
+            <span>Min Similarity: <strong style={{ color: 'var(--text-main)' }}>{minScore}%</strong></span>
             <input
               type="range"
               min="0"
@@ -125,7 +125,7 @@ export default function SearchBar({
             key={idx}
             onClick={() => { setQuery(q); }}
             style={{
-              background: 'rgba(255, 255, 255, 0.04)',
+              background: '#ffffff',
               border: '1px solid var(--border-color)',
               color: 'var(--text-muted)',
               fontSize: '0.78rem',

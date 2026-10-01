@@ -327,7 +327,6 @@ export default function App() {
       {/* ── Body row ── */}
       <div className="app-body" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
-        {/* Left Sidebar */}
         <Sidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}

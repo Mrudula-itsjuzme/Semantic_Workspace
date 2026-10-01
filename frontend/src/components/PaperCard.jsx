@@ -33,7 +33,7 @@ export default function PaperCard({
             </span>
 
             {/* Source Tag */}
-            <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.06)', color: 'var(--text-muted)' }}>
+            <span className="paper-source-tag">
               {paper.source === 'openalex' ? 'OpenAlex Live' : (paper.source || 'Database')}
             </span>
 
@@ -51,13 +51,13 @@ export default function PaperCard({
             style={{
               fontSize: '1.1rem',
               fontWeight: 600,
-              color: '#ffffff',
+              color: 'var(--text-main)',
               cursor: 'pointer',
               lineHeight: 1.35,
               transition: 'color 0.2s ease'
             }}
             onMouseOver={(e) => e.target.style.color = 'var(--accent-cyan)'}
-            onMouseOut={(e) => e.target.style.color = '#ffffff'}
+            onMouseOut={(e) => e.target.style.color = 'var(--text-main)'}
           >
             {paper.title}
           </h3>
@@ -70,9 +70,9 @@ export default function PaperCard({
             onClick={() => onToggleSynthesis(paper)}
             title={isSelectedForSynthesis ? "Remove from Synthesis Matrix" : "Add to Synthesis Matrix"}
             style={{
-              background: isSelectedForSynthesis ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+              background: isSelectedForSynthesis ? '#eaf1ff' : '#ffffff',
               border: isSelectedForSynthesis ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-              color: isSelectedForSynthesis ? '#a5b4fc' : 'var(--text-muted)',
+              color: isSelectedForSynthesis ? '#155eef' : 'var(--text-muted)',
               padding: '6px 12px',
               borderRadius: '8px',
               cursor: 'pointer',
@@ -92,13 +92,13 @@ export default function PaperCard({
       {/* Snippet / Matching Chunk Highlight */}
       {paper.matching_snippet && (
         <div style={{
-          background: 'rgba(15, 23, 42, 0.6)',
+          background: '#f6f8fb',
           borderLeft: '3px solid var(--accent-cyan)',
           padding: '12px 14px',
           borderRadius: '0 8px 8px 0',
           marginBottom: '14px',
           fontSize: '0.88rem',
-          color: '#e2e8f0',
+          color: '#334155',
           fontStyle: 'italic'
         }}>
           <Quote size={14} style={{ color: 'var(--accent-cyan)', marginRight: '6px', opacity: 0.7 }} />
@@ -114,7 +114,7 @@ export default function PaperCard({
       )}
 
       {/* Card Footer Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+      <div className="paper-card-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', paddingTop: '10px', borderTop: '1px solid var(--border-color)' }}>
         {/* Authors */}
         <div style={{ fontSize: '0.78rem', color: 'var(--text-subtle)', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span>Authors:</span>
@@ -152,7 +152,7 @@ export default function PaperCard({
               className="btn-secondary"
               onClick={() => onIngest(paper)}
               disabled={isIngesting}
-              style={{ fontSize: '0.78rem', padding: '5px 12px', background: 'rgba(6, 182, 212, 0.15)', borderColor: 'rgba(6, 182, 212, 0.4)', color: '#67e8f9' }}
+              style={{ fontSize: '0.78rem', padding: '5px 12px', background: '#ecfeff', borderColor: '#a5f3fc', color: '#0e7490' }}
             >
               <Layers size={13} />
               <span>{isIngesting ? 'Vectorizing...' : 'Ingest to Vector DB'}</span>
