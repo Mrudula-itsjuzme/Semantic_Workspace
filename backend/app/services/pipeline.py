@@ -97,7 +97,7 @@ def run_ingestion_pipeline(
                 "UPDATE papers SET pdf_path=COALESCE(pdf_path, :p), is_cached=TRUE "
                 "WHERE id=:pid"
             ),
-            {"p": f"minio://{settings.minio_bucket}/{paper_id}.pdf", "pid": paper_id},
+            {"p": f"minio://{settings.minio_bucket}/paper_{paper_id}.pdf", "pid": paper_id},
         )
         db.commit()
 

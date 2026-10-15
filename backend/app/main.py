@@ -5,7 +5,11 @@ logging.basicConfig(
     format='{"ts":"%(asctime)s","level":"%(levelname)s","logger":"%(name)s","msg":"%(message)s"}',
 )
 
-from fastapi import FastAPI
+import hmac
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from app.core.config import get_settings
+
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_cors_origins
@@ -15,6 +19,15 @@ app = FastAPI(
     title="Semantic Research Workspace API",
     version="0.2.0",
 )
+
+@app.middleware("http")
+async def protect_mutations(request: Request, call_next):
+    if request.method not in {"GET", "HEAD", "OPTIONS"}:
+        expected = get_settings().api_write_key
+        if expected and not hmac.compare_digest(request.headers.get("X-API-Key", ""), expected):
+            return JSONResponse(status_code=401, content={"detail": "Valid X-API-Key required"})
+    return await call_next(request)
+
 
 app.add_middleware(
     CORSMiddleware,

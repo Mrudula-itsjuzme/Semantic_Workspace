@@ -38,10 +38,11 @@ def search_lexical(db: Session, q: str, limit: int = 15) -> list[dict[str, Any]]
 # Vector
 # ------------------------------------------------------------------
 def search_vector(
-    db: Session, q: str, limit: int = 15, min_score: float = 0.0
+    db: Session, q: str, limit: int = 15, min_score: float = 0.0,
+    paper_id: int | None = None,
 ) -> list[dict[str, Any]]:
     emb = get_embedding_service().embed_one(q)
-    results = vector_search(db, emb, limit=limit, min_score=min_score)
+    results = vector_search(db, emb, limit=limit, min_score=min_score, paper_id=paper_id)
     for i, r in enumerate(results):
         r.update(
             {

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import timedelta
 
 from minio import Minio
 from redis import Redis
@@ -75,22 +76,61 @@ def _download_pdf_to_minio(paper_id: int, pdf_url: str) -> str:
 
     obj = f"paper_{paper_id}.pdf"
     logger.info("downloading pdf for paper %s from %s", paper_id, pdf_url)
-    with httpx.Client(timeout=60.0, follow_redirects=True) as client:
-        resp = client.get(pdf_url)
-        resp.raise_for_status()
-    content_type = resp.headers.get("content-type", "")
-    if "pdf" not in content_type.lower() and not resp.content[:5].startswith(b"%PDF-"):
+    from urllib.parse import urlsplit, urljoin
+    import ipaddress
+    import socket
+
+    def validate_public_url(url: str) -> None:
+        parts = urlsplit(url)
+        if parts.scheme != "https" or not parts.hostname or parts.username or parts.password:
+            raise PipelineError("Only public HTTPS PDF URLs are accepted")
+        if parts.port not in (None, 443):
+            raise PipelineError("Nonstandard PDF URL port is not allowed")
+        try:
+            addresses = socket.getaddrinfo(parts.hostname, 443, type=socket.SOCK_STREAM)
+        except OSError as exc:
+            raise PipelineError("Unable to resolve PDF source host") from exc
+        if not addresses or any(not ipaddress.ip_address(item[4][0]).is_global for item in addresses):
+            raise PipelineError("PDF source resolves to a non-public address")
+
+    # Check redirects explicitly; never follow a redirect into an internal address.
+    # Public deployments should additionally block private network egress.
+    with httpx.Client(timeout=60.0, follow_redirects=False) as client:
+        current = pdf_url
+        for _ in range(6):
+            validate_public_url(current)
+            with client.stream("GET", current) as response:
+                if response.status_code in (301, 302, 303, 307, 308):
+                    target = response.headers.get("location")
+                    if not target:
+                        raise PipelineError("PDF redirect missing location")
+                    current = urljoin(current, target)
+                    continue
+                response.raise_for_status()
+                content_type = response.headers.get("content-type", "")
+                chunks = []
+                size = 0
+                for chunk in response.iter_bytes():
+                    size += len(chunk)
+                    if size > 50 * 1024 * 1024:
+                        raise PipelineError("Remote PDF exceeds 50MB limit")
+                    chunks.append(chunk)
+                content = b"".join(chunks)
+                break
+        else:
+            raise PipelineError("Too many PDF redirects")
+    if not content.startswith(b"%PDF-"):
         raise PipelineError(
             f"source URL did not return a PDF (content-type={content_type or 'unknown'})"
         )
     minio_client.put_object(
         MINIO_BUCKET,
         obj,
-        io.BytesIO(resp.content),
-        length=len(resp.content),
+        io.BytesIO(content),
+        length=len(content),
         content_type="application/pdf",
     )
-    logger.info("stored %s bytes for paper %s as %s", len(resp.content), paper_id, obj)
+    logger.info("stored %s bytes for paper %s as %s", len(content), paper_id, obj)
     return obj
 
 
@@ -141,10 +181,8 @@ def process_paper_job(paper_id: int, object_name: str | None = None) -> dict:
 def _maybe_requeue(paper_id: int, obj: str) -> None:
     """Re-enqueue on the queue if attempts remain.
 
-    Retries go straight back onto the queue rather than into RQ's scheduled
-    registry: the pipeline is idempotent (it atomically replaces previous
-    chunks) and most failures are deterministic, so a backoff delay only adds
-    a failure mode where scheduled jobs are never promoted.
+    Retry with exponential backoff. The worker runs with RQ's scheduler
+    enabled, so scheduled jobs are promoted when their delay elapses.
     """
     from sqlalchemy import text as sql_text
 
@@ -158,11 +196,13 @@ def _maybe_requeue(paper_id: int, obj: str) -> None:
         ).fetchone()
         attempts = row.ingestion_attempts if row else 0
         if attempts < MAX_ATTEMPTS:
-            queue.enqueue(
+            delay = min(300, 2 ** min(attempts, 8))
+            queue.enqueue_in(
+                timedelta(seconds=delay),
                 "app.worker.worker.process_paper_job",
                 paper_id,
                 obj,
-                timeout=JOB_TIMEOUT,
+                job_timeout=JOB_TIMEOUT,
             )
             logger.info("requeued paper %s (attempt %s)", paper_id, attempts + 1)
     finally:
@@ -179,4 +219,4 @@ if __name__ == "__main__":
     ensure_bucket()
     logger.info("worker listening on queue paper_tasks")
     worker = Worker([queue], connection=redis_connection)
-    worker.work()
+    worker.work(with_scheduler=True)

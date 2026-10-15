@@ -219,7 +219,7 @@ def graph_expand(seed_ids: list[int], max_hops: int = 1, limit: int = 30) -> lis
         return run_query(
             """
             UNWIND $seeds AS sid
-            MATCH (seed:Paper {pg_id: sid})-[:CITES|AUTHORED*1..1]-(n:Paper)
+            MATCH (seed:Paper {pg_id: sid})-[:CITES]-(n:Paper)
             WHERE NOT n.pg_id IN $seeds
             RETURN DISTINCT n.pg_id AS paper_id, n.title AS title,
                    n.year AS year,
@@ -231,7 +231,7 @@ def graph_expand(seed_ids: list[int], max_hops: int = 1, limit: int = 30) -> lis
     return run_query(
         """
         UNWIND $seeds AS sid
-        MATCH (seed:Paper {pg_id: sid})-[:CITES*1..%d]-(n:Paper)
+        MATCH path = (seed:Paper {pg_id: sid})-[:CITES*1..%d]-(n:Paper)
         WHERE NOT n.pg_id IN $seeds
         RETURN DISTINCT n.pg_id AS paper_id, n.title AS title,
                n.year AS year,

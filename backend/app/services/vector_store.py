@@ -73,6 +73,7 @@ def vector_search(
     query_embedding: Sequence[float],
     limit: int = 10,
     min_score: float = 0.0,
+    paper_id: int | None = None,
 ) -> list[dict[str, Any]]:
     rows = db.execute(
         text(
@@ -88,11 +89,12 @@ def vector_search(
             FROM chunks c
             JOIN papers p ON p.id = c.paper_id
             WHERE 1 - (c.embedding <=> CAST(:emb AS vector)) >= :min_score
+              AND (:paper_id IS NULL OR c.paper_id = :paper_id)
             ORDER BY c.embedding <=> CAST(:emb AS vector)
             LIMIT :lim
             """
         ),
-        {"emb": to_pgvector(query_embedding), "min_score": min_score, "lim": limit},
+        {"emb": to_pgvector(query_embedding), "min_score": min_score, "lim": limit, "paper_id": paper_id},
     ).fetchall()
     return [dict(r._mapping) for r in rows]
 
@@ -141,7 +143,7 @@ def lexical_search(
                    p.venue,
                    c.content,
                    ts_rank(to_tsvector('english', c.content),
-                           to_tsquery('english', :oq)) AS score
+                           websearch_websearch_to_tsquery('english', :oq)) AS score
             FROM chunks c
             JOIN papers p ON p.id = c.paper_id
             WHERE to_tsvector('english', c.content) @@ to_tsquery('english', :oq)
@@ -150,9 +152,7 @@ def lexical_search(
             """
         ),
         {
-            "oq": " | ".join(
-                t.replace("'", "") for t in query.split() if t.strip()
-            ) or query,
+            "oq": " OR ".join(query.split()) or query,
             "lim": limit,
         },
     ).fetchall()
