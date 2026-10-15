@@ -98,7 +98,7 @@ def transaction_demo(db: Session = Depends(get_db)):
         return results
 
 
-@router.get("/isolation-demo")
+@router.post("/isolation-demo")
 def isolation_demo():
     """Two concurrent transactions at READ COMMITTED vs SERIALIZABLE.
 
@@ -161,7 +161,7 @@ def view_overview(db: Session = Depends(get_db)):
     return {"concept": "SQL view (v_paper_overview)", "rows": _rows(rows)}
 
 
-@router.get("/trigger-demo/{paper_id}")
+@router.post("/trigger-demo/{paper_id}")
 def trigger_demo(paper_id: int, db: Session = Depends(get_db)):
     """Show the ingestion trigger: flipping status to 'running' bumps attempts
     and stamps started_at automatically."""
@@ -171,6 +171,8 @@ def trigger_demo(paper_id: int, db: Session = Depends(get_db)):
     ).fetchone()
     if not before:
         return {"error": "paper not found"}
+    # Demonstrate the trigger without persisting synthetic ingestion states.
+    db.begin_nested()
     db.execute(
         text("UPDATE papers SET ingestion_status='running' WHERE id=:pid"),
         {"pid": paper_id},
@@ -184,7 +186,7 @@ def trigger_demo(paper_id: int, db: Session = Depends(get_db)):
         text("SELECT ingestion_attempts, ingestion_started_at FROM papers WHERE id=:pid"),
         {"pid": paper_id},
     ).fetchone()
-    db.commit()
+    db.rollback()
     return {
         "concept": "BEFORE UPDATE trigger (fn_touch_ingestion)",
         "attempts_before": before.ingestion_attempts,

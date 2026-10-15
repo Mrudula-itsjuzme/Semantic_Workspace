@@ -1,3 +1,4 @@
+from uuid import uuid4
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -57,13 +58,14 @@ async def upload_pdf(paper_id: int, file: UploadFile = File(...), db: Session = 
     except Exception:
         raise HTTPException(status_code=502, detail="Object storage unavailable")
 
-    # Record pending state first so an immediately executing worker sees it.
+    pending_id = str(uuid4())
+    # Persist the planned RQ ID before scheduling the worker.
     db.execute(
         text(
             "INSERT INTO ingestion_jobs (paper_id, rq_job_id, status) "
             "VALUES (:pid, :jid, 'queued')"
         ),
-        {"pid": paper_id, "jid": "pending"},
+        {"pid": paper_id, "jid": pending_id},
     )
     db.execute(
         text("UPDATE papers SET ingestion_status='pending' WHERE id=:pid"),
@@ -71,9 +73,7 @@ async def upload_pdf(paper_id: int, file: UploadFile = File(...), db: Session = 
     )
     db.commit()
     try:
-        job = paper_queue.enqueue("app.worker.worker.process_paper_job", paper_id, object_name)
-        db.execute(text("UPDATE ingestion_jobs SET rq_job_id=:jid WHERE paper_id=:pid AND rq_job_id='pending'"), {"jid": job.id, "pid": paper_id})
-        db.commit()
+        job = paper_queue.enqueue("app.worker.worker.process_paper_job", paper_id, object_name, job_id=pending_id)
     except Exception:
         db.rollback()
         db.execute(text("UPDATE papers SET ingestion_status='failed', ingestion_error='Queue unavailable' WHERE id=:pid"), {"pid": paper_id})
@@ -131,18 +131,17 @@ def retry_ingestion(paper_id: int, db: Session = Depends(get_db)):
     )
     db.commit()
 
-    # Persist a job record before making work visible to the worker.
+    pending_id = str(uuid4())
+    # Persist the planned job ID before scheduling it.
     db.execute(
         text(
             "INSERT INTO ingestion_jobs (paper_id, rq_job_id, status) VALUES (:pid, :jid, 'queued')"
         ),
-        {"pid": paper_id, "jid": "pending"},
+        {"pid": paper_id, "jid": pending_id},
     )
     db.commit()
     try:
-        job = paper_queue.enqueue("app.worker.worker.process_paper_job", paper_id)
-        db.execute(text("UPDATE ingestion_jobs SET rq_job_id=:jid WHERE paper_id=:pid AND rq_job_id='pending'"), {"jid": job.id, "pid": paper_id})
-        db.commit()
+        job = paper_queue.enqueue("app.worker.worker.process_paper_job", paper_id, job_id=pending_id)
     except Exception:
         db.rollback()
         db.execute(text("UPDATE papers SET ingestion_status='failed', ingestion_error='Queue unavailable' WHERE id=:pid"), {"pid": paper_id})
