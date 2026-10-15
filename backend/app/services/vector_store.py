@@ -143,7 +143,7 @@ def lexical_search(
                    p.venue,
                    c.content,
                    ts_rank(to_tsvector('english', c.content),
-                           to_tsquery('english', :oq)) AS score
+                           websearch_websearch_to_tsquery('english', :oq)) AS score
             FROM chunks c
             JOIN papers p ON p.id = c.paper_id
             WHERE to_tsvector('english', c.content) @@ to_tsquery('english', :oq)
@@ -152,9 +152,7 @@ def lexical_search(
             """
         ),
         {
-            "oq": " | ".join(
-                t.replace("'", "") for t in query.split() if t.strip()
-            ) or query,
+            "oq": " OR ".join(query.split()) or query,
             "lim": limit,
         },
     ).fetchall()

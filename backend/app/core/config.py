@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     llm_model: str = "gpt-4o-mini"
 
+    # ---------- API access ----------
+    api_write_key: str = ""  # optional local-development key for mutating endpoints
+
     # ---------- HTTP ----------
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 

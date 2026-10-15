@@ -36,13 +36,8 @@ def retrieve_evidence(
     """Hybrid retrieval seeded on the question, expanded via the graph."""
     seeds = search_vector(db, question, limit=6)
 
-    # Fall back to lexical seeds when the embedding space is empty
-    if not seeds:
-        seeds = search_hybrid(db, question, limit=6)
-        seeds = [s for s in seeds if "vector" in s.get("provenance", {})]
-        # RRF scores are not cosine similarities, so fallback candidates
-        # must be checked against the vector retriever separately.
-        seeds = [] if not seeds else search_vector(db, question, limit=6, min_score=MIN_EVIDENCE_SCORE / 100.0)
+    # Evidence scores must remain calibrated cosine similarities.
+    # Lexical/RRF scores are not interchangeable with cosine similarity.
 
     seed_paper_ids = sorted({s["paper_id"] for s in seeds})
     expanded: list[dict[str, Any]] = []

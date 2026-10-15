@@ -33,9 +33,11 @@ async def upload_pdf(paper_id: int, file: UploadFile = File(...), db: Session = 
     if (file.content_type or "") not in ("application/pdf",) and not (file.filename or "").lower().endswith(".pdf"):
         raise HTTPException(status_code=415, detail="Only PDF files are accepted")
 
-    data = await file.read()
+    data = await file.read(50 * 1024 * 1024 + 1)
     if len(data) > 50 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="PDF exceeds 50MB limit")
+    if not data.startswith(b"%PDF-"):
+        raise HTTPException(status_code=415, detail="Invalid PDF signature")
 
     s = get_settings()
     object_name = f"paper_{paper_id}.pdf"
@@ -55,21 +57,28 @@ async def upload_pdf(paper_id: int, file: UploadFile = File(...), db: Session = 
     except Exception:
         raise HTTPException(status_code=502, detail="Object storage unavailable")
 
-    job = paper_queue.enqueue(
-        "app.worker.worker.process_paper_job", paper_id, object_name
-    )
+    # Record pending state first so an immediately executing worker sees it.
     db.execute(
         text(
             "INSERT INTO ingestion_jobs (paper_id, rq_job_id, status) "
             "VALUES (:pid, :jid, 'queued')"
         ),
-        {"pid": paper_id, "jid": job.id},
+        {"pid": paper_id, "jid": "pending"},
     )
     db.execute(
         text("UPDATE papers SET ingestion_status='pending' WHERE id=:pid"),
         {"pid": paper_id},
     )
     db.commit()
+    try:
+        job = paper_queue.enqueue("app.worker.worker.process_paper_job", paper_id, object_name)
+        db.execute(text("UPDATE ingestion_jobs SET rq_job_id=:jid WHERE paper_id=:pid AND rq_job_id='pending'"), {"jid": job.id, "pid": paper_id})
+        db.commit()
+    except Exception:
+        db.rollback()
+        db.execute(text("UPDATE papers SET ingestion_status='failed', ingestion_error='Queue unavailable' WHERE id=:pid"), {"pid": paper_id})
+        db.commit()
+        raise HTTPException(status_code=503, detail="Job queue unavailable")
 
     return {
         "message": "PDF uploaded; ingestion queued",
@@ -122,16 +131,23 @@ def retry_ingestion(paper_id: int, db: Session = Depends(get_db)):
     )
     db.commit()
 
-    # Object name intentionally omitted so the worker auto-resolves the PDF
-    # (MinIO object or the paper's pdf_url).
-    job = paper_queue.enqueue("app.worker.worker.process_paper_job", paper_id)
+    # Persist a job record before making work visible to the worker.
     db.execute(
         text(
             "INSERT INTO ingestion_jobs (paper_id, rq_job_id, status) VALUES (:pid, :jid, 'queued')"
         ),
-        {"pid": paper_id, "jid": job.id},
+        {"pid": paper_id, "jid": "pending"},
     )
     db.commit()
+    try:
+        job = paper_queue.enqueue("app.worker.worker.process_paper_job", paper_id)
+        db.execute(text("UPDATE ingestion_jobs SET rq_job_id=:jid WHERE paper_id=:pid AND rq_job_id='pending'"), {"jid": job.id, "pid": paper_id})
+        db.commit()
+    except Exception:
+        db.rollback()
+        db.execute(text("UPDATE papers SET ingestion_status='failed', ingestion_error='Queue unavailable' WHERE id=:pid"), {"pid": paper_id})
+        db.commit()
+        raise HTTPException(status_code=503, detail="Job queue unavailable")
     return {"message": "Re-ingestion queued", "paper_id": paper_id, "job_id": job.id}
 
 
