@@ -75,22 +75,61 @@ def _download_pdf_to_minio(paper_id: int, pdf_url: str) -> str:
 
     obj = f"paper_{paper_id}.pdf"
     logger.info("downloading pdf for paper %s from %s", paper_id, pdf_url)
-    with httpx.Client(timeout=60.0, follow_redirects=True) as client:
-        resp = client.get(pdf_url)
-        resp.raise_for_status()
-    content_type = resp.headers.get("content-type", "")
-    if "pdf" not in content_type.lower() and not resp.content[:5].startswith(b"%PDF-"):
+    from urllib.parse import urlsplit, urljoin
+    import ipaddress
+    import socket
+
+    def validate_public_url(url: str) -> None:
+        parts = urlsplit(url)
+        if parts.scheme != "https" or not parts.hostname or parts.username or parts.password:
+            raise PipelineError("Only public HTTPS PDF URLs are accepted")
+        if parts.port not in (None, 443):
+            raise PipelineError("Nonstandard PDF URL port is not allowed")
+        try:
+            addresses = socket.getaddrinfo(parts.hostname, 443, type=socket.SOCK_STREAM)
+        except OSError as exc:
+            raise PipelineError("Unable to resolve PDF source host") from exc
+        if not addresses or any(not ipaddress.ip_address(item[4][0]).is_global for item in addresses):
+            raise PipelineError("PDF source resolves to a non-public address")
+
+    # Check redirects explicitly; never follow a redirect into an internal address.
+    # Public deployments should additionally block private network egress.
+    with httpx.Client(timeout=60.0, follow_redirects=False) as client:
+        current = pdf_url
+        for _ in range(6):
+            validate_public_url(current)
+            with client.stream("GET", current) as response:
+                if response.status_code in (301, 302, 303, 307, 308):
+                    target = response.headers.get("location")
+                    if not target:
+                        raise PipelineError("PDF redirect missing location")
+                    current = urljoin(current, target)
+                    continue
+                response.raise_for_status()
+                content_type = response.headers.get("content-type", "")
+                chunks = []
+                size = 0
+                for chunk in response.iter_bytes():
+                    size += len(chunk)
+                    if size > 50 * 1024 * 1024:
+                        raise PipelineError("Remote PDF exceeds 50MB limit")
+                    chunks.append(chunk)
+                content = b"".join(chunks)
+                break
+        else:
+            raise PipelineError("Too many PDF redirects")
+    if not content.startswith(b"%PDF-"):
         raise PipelineError(
             f"source URL did not return a PDF (content-type={content_type or 'unknown'})"
         )
     minio_client.put_object(
         MINIO_BUCKET,
         obj,
-        io.BytesIO(resp.content),
-        length=len(resp.content),
+        io.BytesIO(content),
+        length=len(content),
         content_type="application/pdf",
     )
-    logger.info("stored %s bytes for paper %s as %s", len(resp.content), paper_id, obj)
+    logger.info("stored %s bytes for paper %s as %s", len(content), paper_id, obj)
     return obj
 
 
