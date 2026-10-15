@@ -20,7 +20,7 @@ from app.services.search_service import search_hybrid, search_vector
 
 logger = logging.getLogger(__name__)
 
-MIN_EVIDENCE_SCORE = 0.15  # cosine similarity floor for usable evidence
+MIN_EVIDENCE_SCORE = 15.0  # search_vector exposes cosine similarity on a 0-100 scale
 MAX_EVIDENCE = 6
 
 
@@ -39,7 +39,10 @@ def retrieve_evidence(
     # Fall back to lexical seeds when the embedding space is empty
     if not seeds:
         seeds = search_hybrid(db, question, limit=6)
-        seeds = [s for s in seeds if s.get("provenance")]
+        seeds = [s for s in seeds if "vector" in s.get("provenance", {})]
+        # RRF scores are not cosine similarities, so fallback candidates
+        # must be checked against the vector retriever separately.
+        seeds = [] if not seeds else search_vector(db, question, limit=6, min_score=MIN_EVIDENCE_SCORE / 100.0)
 
     seed_paper_ids = sorted({s["paper_id"] for s in seeds})
     expanded: list[dict[str, Any]] = []
@@ -51,8 +54,10 @@ def retrieve_evidence(
                 # Pull one high-similarity chunk per expanded paper
                 extra = search_vector(
                     db,
-                    question + " " + (n.get("title") or ""),
+                    question,
                     limit=1,
+                    min_score=MIN_EVIDENCE_SCORE / 100.0,
+                    paper_id=n["paper_id"],
                 )
                 for e in extra:
                     e["graph_hops"] = n.get("hops", 1)
@@ -74,7 +79,9 @@ def retrieve_evidence(
             candidates[cid] = rec
 
     ranked = sorted(candidates.values(), key=lambda r: r["score"], reverse=True)
-    return [r for r in ranked if r["score"] >= MIN_EVIDENCE_SCORE][:limit]
+    # Hybrid fallback scores are not calibrated cosine similarities.
+    # Require vector evidence for a reliable similarity threshold.
+    return [r for r in ranked if r.get("retriever") == "vector" and r["score"] >= MIN_EVIDENCE_SCORE][:limit]
 
 
 # ----------------------------------------------------------------------
@@ -99,7 +106,7 @@ def build_evidence_context(evidence: list[dict[str, Any]]) -> tuple[str, list[di
                 "year": ev.get("year"),
                 "doi": ev.get("doi"),
                 "venue": ev.get("venue"),
-                "score": round(float(ev["score"]) * 100, 1),
+                "score": round(float(ev["score"]), 1),
                 "snippet": snippet[:300],
                 "graph_hops": ev.get("graph_hops", 0),
                 "provenance": ev.get("provenance", {}),
