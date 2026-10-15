@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import timedelta
 
 from minio import Minio
 from redis import Redis
@@ -180,10 +181,8 @@ def process_paper_job(paper_id: int, object_name: str | None = None) -> dict:
 def _maybe_requeue(paper_id: int, obj: str) -> None:
     """Re-enqueue on the queue if attempts remain.
 
-    Retries go straight back onto the queue rather than into RQ's scheduled
-    registry: the pipeline is idempotent (it atomically replaces previous
-    chunks) and most failures are deterministic, so a backoff delay only adds
-    a failure mode where scheduled jobs are never promoted.
+    Retry with exponential backoff. The worker runs with RQ's scheduler
+    enabled, so scheduled jobs are promoted when their delay elapses.
     """
     from sqlalchemy import text as sql_text
 
@@ -197,11 +196,13 @@ def _maybe_requeue(paper_id: int, obj: str) -> None:
         ).fetchone()
         attempts = row.ingestion_attempts if row else 0
         if attempts < MAX_ATTEMPTS:
-            queue.enqueue(
+            delay = min(300, 2 ** min(attempts, 8))
+            queue.enqueue_in(
+                timedelta(seconds=delay),
                 "app.worker.worker.process_paper_job",
                 paper_id,
                 obj,
-                timeout=JOB_TIMEOUT,
+                job_timeout=JOB_TIMEOUT,
             )
             logger.info("requeued paper %s (attempt %s)", paper_id, attempts + 1)
     finally:
@@ -218,4 +219,4 @@ if __name__ == "__main__":
     ensure_bucket()
     logger.info("worker listening on queue paper_tasks")
     worker = Worker([queue], connection=redis_connection)
-    worker.work()
+    worker.work(with_scheduler=True)

@@ -177,11 +177,7 @@ def trigger_demo(paper_id: int, db: Session = Depends(get_db)):
         text("UPDATE papers SET ingestion_status='running' WHERE id=:pid"),
         {"pid": paper_id},
     )
-    # restore
-    db.execute(
-        text("UPDATE papers SET ingestion_status='success' WHERE id=:pid"),
-        {"pid": paper_id},
-    )
+    # Roll back this demonstration after observing the trigger effect.
     after = db.execute(
         text("SELECT ingestion_attempts, ingestion_started_at FROM papers WHERE id=:pid"),
         {"pid": paper_id},
