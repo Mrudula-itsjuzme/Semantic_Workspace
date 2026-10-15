@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Sparkles, Search, Scale, Target, GitBranch, Quote, CheckSquare, ArrowRight, Check, Plus, AlertCircle, RefreshCw } from 'lucide-react';
+import { Sparkles, Search, Scale, Target, GitBranch, Quote, CheckSquare, ArrowRight, Plus, AlertCircle, RefreshCw, X } from 'lucide-react';
 import axios from 'axios';
 import { apiUrl } from '../api';
 
-export default function CopilotSidebar({ onTriggerTool, onAddGeneratedTask, onAddPaperToCanvas }) {
+export default function CopilotSidebar({ onClose, onTriggerTool, onAddGeneratedTask, onAddPaperToCanvas, projectId = 'workspace-default', projectName }) {
   const [isScanning, setIsScanning] = useState(false);
   const [parsedResults, setParsedResults] = useState(null);
 
@@ -11,12 +11,15 @@ export default function CopilotSidebar({ onTriggerTool, onAddGeneratedTask, onAd
     setIsScanning(true);
     try {
       // Read active canvas nodes from localStorage
-      const savedNodes = localStorage.getItem('srw_canvas_elements_v4');
+      const canvasKey = projectId === 'workspace-default'
+        ? 'srw_canvas_elements_v4'
+        : `srw_canvas_elements_v4_${projectId}`;
+      const savedNodes = localStorage.getItem(canvasKey);
       const canvasNodes = savedNodes ? JSON.parse(savedNodes) : [];
 
       const res = await axios.post(apiUrl('/api/ai/parse-workspace'), {
         canvas_nodes: canvasNodes,
-        project_name: localStorage.getItem('srw_project_name') || 'Untitled Research Project'
+        project_name: projectName || localStorage.getItem('srw_project_name') || 'Untitled Research Project'
       });
 
       setParsedResults(res.data);
@@ -37,6 +40,7 @@ export default function CopilotSidebar({ onTriggerTool, onAddGeneratedTask, onAd
           <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>
             Research Copilot
           </h3>
+          <button className="copilot-close" onClick={onClose} aria-label="Close research copilot"><X size={16} /></button>
         </div>
         <p style={{ fontSize: '0.78rem', color: '#64748b' }}>
           AI workspace parser & suggestions
@@ -77,7 +81,7 @@ export default function CopilotSidebar({ onTriggerTool, onAddGeneratedTask, onAd
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {(parsedResults.todos || []).map((todo, ti) => (
+              {(parsedResults.todos || []).map((todo) => (
                 <div key={todo.id} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px 10px', fontSize: '0.78rem' }}>
                   <div style={{ fontWeight: 600, color: '#0f172a', marginBottom: '4px', lineHeight: 1.3 }}>
                     {todo.text}

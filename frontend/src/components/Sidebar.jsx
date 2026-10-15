@@ -1,66 +1,101 @@
 import React from 'react';
 import {
-  LayoutGrid, FileText, Layers, CheckSquare, GitCompare, Edit3,
-  Download, Database, Search, CheckCircle2, Activity, Network
+  FileText, Layers, CheckSquare, GitCompare, Search, Sparkles, Network,
+  Folder, Plus, ArrowRight, Database
 } from 'lucide-react';
 
-export default function Sidebar({ activeTab, setActiveTab, stats, taskCount }) {
-  const navItems = [
-    { id: 'canvas',   label: 'Canvas',           icon: Layers },
-    { id: 'explorer', label: 'Literature Search', icon: Search },
-    { id: 'graph',    label: 'Knowledge Graph',  icon: Network },
-    { id: 'papers',   label: 'Papers Library',   icon: FileText },
-    { id: 'compare',  label: 'Synthesis',         icon: GitCompare },
-    { id: 'assistant',label: 'AI Assistant',      icon: Activity },
-    { id: 'tasks',    label: 'Tasks',             icon: CheckSquare },
-  ];
+const navItems = [
+  { id: 'canvas', label: 'Canvas', icon: Layers },
+  { id: 'explorer', label: 'Literature Search', icon: Search },
+  { id: 'graph', label: 'Knowledge Graph', icon: Network },
+  { id: 'papers', label: 'Papers Library', icon: FileText },
+  { id: 'compare', label: 'Synthesis', icon: GitCompare },
+  { id: 'assistant', label: 'AI Assistant', icon: Sparkles },
+  { id: 'tasks', label: 'Tasks', icon: CheckSquare },
+];
 
-  // Derive all real stats from props — zero hardcoding
-  const nodes       = stats?.nodes        ?? '—';
-  const connections = stats?.connections  ?? '—';
-  const papers      = stats?.total_papers ?? '—';
-  const vectors     = stats?.total_vector_chunks ?? '—';
-  const tasks       = taskCount           ?? '—';
-  const dbStatus    = stats?.database === 'connected';
+export default function Sidebar({
+  activeTab, setActiveTab, stats, taskCount, projects = [], activeProjectId,
+  onSelectProject, onCreateProject, papers = [], onSelectPaper
+}) {
+  const paperCount = stats?.total_papers ?? '—';
+  const vectorCount = stats?.total_vector_chunks ?? '—';
+  const dbConnected = stats?.database === 'connected';
 
   return (
-    <nav className="workspace-sidebar" aria-label="Workspace sections">
-      <div className="workspace-nav-list">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          return (
-            <button className={`workspace-nav-item ${isActive ? 'is-active' : ''}`}
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              aria-current={isActive ? 'page' : undefined}
-              title={item.label}
-            >
-              <div className="workspace-nav-label">
-                <Icon size={16} />
-                <span>{item.label}</span>
-              </div>
+    <aside className="workspace-sidebar">
+      <nav className="workspace-sections" aria-label="Workspace sections">
+        <p className="sidebar-section-title">Workspace</p>
+        {navItems.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            className={`workspace-nav-item ${activeTab === id ? 'is-active' : ''}`}
+            onClick={() => setActiveTab(id)}
+            aria-current={activeTab === id ? 'page' : undefined}
+          >
+            <Icon size={17} strokeWidth={1.8} />
+            <span>{label}</span>
+            {id === 'tasks' && <span className="workspace-nav-badge">{taskCount}</span>}
+            {id === 'papers' && paperCount !== '—' && <span className="workspace-nav-badge">{paperCount}</span>}
+          </button>
+        ))}
+      </nav>
 
-              {/* Live count badge */}
-              {item.id === 'papers' && papers !== '—' && (
-                <span className="workspace-nav-badge">
-                  {papers}
-                </span>
-              )}
-              {item.id === 'tasks' && tasks !== '—' && (
-                <span className="workspace-nav-badge">
-                  {tasks}
-                </span>
-              )}
+      <section className="sidebar-projects" aria-labelledby="sidebar-projects-title">
+        <div className="sidebar-section-heading">
+          <p className="sidebar-section-title" id="sidebar-projects-title">Projects</p>
+          <button className="sidebar-icon-button" onClick={onCreateProject} aria-label="Create project" title="Create project">
+            <Plus size={17} />
+          </button>
+        </div>
+        <div className="sidebar-project-list">
+          {projects.map(project => (
+            <button
+              key={project.id}
+              className={`sidebar-project ${project.id === activeProjectId ? 'is-active' : ''}`}
+              onClick={() => onSelectProject(project.id)}
+              title={project.name}
+            >
+              <Folder size={16} strokeWidth={1.8} />
+              <span>{project.name}</span>
             </button>
-          );
-        })}
+          ))}
+        </div>
+      </section>
+
+      <section className="sidebar-recent" aria-labelledby="sidebar-recent-title">
+        <div className="sidebar-section-heading">
+          <p className="sidebar-section-title" id="sidebar-recent-title">Recent papers</p>
+          {papers.length > 4 && (
+            <button className="sidebar-text-button" onClick={() => setActiveTab('papers')}>All</button>
+          )}
+        </div>
+        {papers.length ? (
+          <div className="sidebar-recent-list">
+            {papers.slice(0, 4).map(paper => (
+              <button className="sidebar-paper" key={paper.id} onClick={() => onSelectPaper(paper)} title={paper.title}>
+                <span className="sidebar-paper-icon"><FileText size={15} /></span>
+                <span className="sidebar-paper-copy">
+                  <span className="sidebar-paper-title">{paper.title}</span>
+                  <span className="sidebar-paper-meta">{paper.publication_year || 'Year n/a'}{paper.venue ? ` · ${paper.venue}` : ''}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="sidebar-empty-papers">
+            <span>No papers saved yet</span>
+            <button className="sidebar-text-button" onClick={() => setActiveTab('explorer')}>Find papers <ArrowRight size={13} /></button>
+          </div>
+        )}
+      </section>
+
+      <div className="sidebar-status">
+        <span className={`workspace-status-dot ${dbConnected ? 'is-connected' : ''}`} />
+        <span>{dbConnected ? 'Database connected' : 'Database offline'}</span>
+        <span className="sidebar-status-count"><Database size={13} /> {vectorCount} vectors</span>
       </div>
-      <div className="workspace-nav-status" title={dbStatus ? 'Database connected' : 'Database offline'}>
-        <span className={`workspace-status-dot ${dbStatus ? 'is-connected' : ''}`} />
-        <span>{dbStatus ? 'Connected' : 'Offline'}</span>
-        <span className="workspace-status-count">{papers} papers</span>
-      </div>
-    </nav>
+    </aside>
   );
 }
+

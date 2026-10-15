@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Layers, ExternalLink, BookOpen, Quote, Copy, Check } from 'lucide-react';
+import { X, Layers, Copy, Check } from 'lucide-react';
 
 export default function PaperDetailDrawer({ paper, onClose }) {
   const [copied, setCopied] = useState(false);

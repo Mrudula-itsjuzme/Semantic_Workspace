@@ -19,31 +19,65 @@ import AiAssistant from './components/AiAssistant';
 import LibraryView from './components/LibraryView';
 import GraphExplorer from './components/GraphExplorer';
 
-// Read canvas element & connection counts live from localStorage
-function getCanvasStats() {
+const DEFAULT_PROJECT_ID = 'workspace-default';
+
+function scopedKey(key, projectId) {
+  return projectId === DEFAULT_PROJECT_ID ? key : `${key}_${projectId}`;
+}
+
+function readArray(key) {
   try {
-    const elems = JSON.parse(localStorage.getItem('srw_canvas_elements_v4') || '[]');
-    const conns = JSON.parse(localStorage.getItem('srw_canvas_connections_v4') || '[]');
-    return { nodes: elems.length, connections: conns.length };
+    const value = JSON.parse(localStorage.getItem(key) || '[]');
+    return Array.isArray(value) ? value : [];
   } catch {
-    return { nodes: 0, connections: 0 };
+    return [];
   }
 }
 
+function getSavedProjects() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('srw_projects_v1') || '[]');
+    const validProjects = Array.isArray(saved) ? saved.filter(project => project?.id && project?.name) : [];
+    if (validProjects.length) return validProjects;
+  } catch { /* migrate the existing single project below */ }
+  return [{
+    id: DEFAULT_PROJECT_ID,
+    name: localStorage.getItem('srw_project_name') || 'Untitled Research Project'
+  }];
+}
+
+function getCanvasStats(projectId) {
+  const elems = readArray(scopedKey('srw_canvas_elements_v4', projectId));
+  const conns = readArray(scopedKey('srw_canvas_connections_v4', projectId));
+  return { nodes: elems.length, connections: conns.length };
+}
+
+function getSavedTasks(projectId) {
+  return readArray(scopedKey('srw_workspace_tasks_v2', projectId));
+}
+
 export default function App() {
+  const [projects, setProjects] = useState(getSavedProjects);
+  const [activeProjectId, setActiveProjectId] = useState(() => {
+    const savedId = localStorage.getItem('srw_active_project_id');
+    const savedProjects = getSavedProjects();
+    return savedProjects.some(project => project.id === savedId) ? savedId : savedProjects[0].id;
+  });
+  const activeProject = projects.find(project => project.id === activeProjectId) || projects[0];
+  const selectedProject = activeProject?.name || 'Untitled Research Project';
   const [activeTab, setActiveTab] = useState('canvas');
-  const [selectedProject, setSelectedProject] = useState(
-    () => localStorage.getItem('srw_project_name') || 'Untitled Research Project'
-  );
+  const [copilotOpen, setCopilotOpen] = useState(false);
+  const [assistantPrompt, setAssistantPrompt] = useState(null);
+  const [canvasPaperRequest, setCanvasPaperRequest] = useState(null);
 
   // Backend health stats (papers, vector chunks, db status)
   const [healthStats, setHealthStats] = useState(null);
   // Live canvas stats derived from localStorage
-  const [canvasStats, setCanvasStats] = useState(getCanvasStats);
+  const [canvasStats, setCanvasStats] = useState(() => getCanvasStats(activeProject?.id || DEFAULT_PROJECT_ID));
 
   // Bottom dock: which panel is active, and whether it's collapsed
   const [bottomDockTab, setBottomDockTab] = useState('papers');
-  const [isDockCollapsed, setIsDockCollapsed] = useState(false);
+  const [isDockCollapsed, setIsDockCollapsed] = useState(true);
 
   // Search state — default to hybrid (RRF) which is the strongest mode
   const [query, setQuery] = useState('');
@@ -59,32 +93,46 @@ export default function App() {
   const [ingestingId, setIngestingId] = useState(null);
 
   // Tasks — persisted to localStorage, initialised with empty array (no fake defaults)
-  const [tasks, setTasks] = useState(() => {
-    const saved = localStorage.getItem('srw_workspace_tasks_v2');
-    return saved ? JSON.parse(saved) : [];
+  const [tasksByProject, setTasksByProject] = useState(() => Object.fromEntries(
+    getSavedProjects().map(project => [project.id, getSavedTasks(project.id)])
+  ));
+  const tasks = tasksByProject[activeProjectId] || [];
+  const setTasks = (update) => setTasksByProject(previous => {
+    const current = previous[activeProjectId] || [];
+    return { ...previous, [activeProjectId]: typeof update === 'function' ? update(current) : update };
   });
 
-  // Persist project name
+  // Persist projects and their active selection locally.
   useEffect(() => {
+    localStorage.setItem('srw_projects_v1', JSON.stringify(projects));
+    if (projects.length && !projects.some(project => project.id === activeProjectId)) {
+      setActiveProjectId(projects[0].id);
+    }
+  }, [projects, activeProjectId]);
+
+  useEffect(() => {
+    localStorage.setItem('srw_active_project_id', activeProjectId);
     localStorage.setItem('srw_project_name', selectedProject);
-  }, [selectedProject]);
+  }, [activeProjectId, selectedProject]);
 
   // Persist tasks
   useEffect(() => {
-    localStorage.setItem('srw_workspace_tasks_v2', JSON.stringify(tasks));
-  }, [tasks]);
+    Object.entries(tasksByProject).forEach(([projectId, projectTasks]) => {
+      localStorage.setItem(scopedKey('srw_workspace_tasks_v2', projectId), JSON.stringify(projectTasks));
+    });
+  }, [tasksByProject]);
 
   // Refresh canvas stats whenever the tab changes back to canvas
   useEffect(() => {
-    setCanvasStats(getCanvasStats());
-  }, [activeTab]);
+    setCanvasStats(getCanvasStats(activeProjectId));
+  }, [activeTab, activeProjectId]);
 
   // Also poll canvas stats every 3 s while on canvas tab
   useEffect(() => {
     if (activeTab !== 'canvas') return;
-    const id = setInterval(() => setCanvasStats(getCanvasStats()), 3000);
+    const id = setInterval(() => setCanvasStats(getCanvasStats(activeProjectId)), 3000);
     return () => clearInterval(id);
-  }, [activeTab]);
+  }, [activeTab, activeProjectId]);
 
   // Combine all stats for sidebar
   const mergedStats = {
@@ -135,7 +183,35 @@ export default function App() {
     }
   }, [query, searchMode, minScore]);
 
-  const handleAskAi = () => setActiveTab('assistant');
+  const handleAskAi = (question) => {
+    if (question?.trim()) setAssistantPrompt({ id: Date.now(), text: question.trim() });
+    setActiveTab('assistant');
+  };
+
+  const handleCreateProject = () => {
+    const name = window.prompt('Name your project');
+    if (!name?.trim()) return;
+    if (projects.some(project => project.name.toLocaleLowerCase() === name.trim().toLocaleLowerCase())) {
+      window.alert('A project with that name already exists.');
+      return;
+    }
+    const project = { id: `project_${Date.now()}`, name: name.trim() };
+    setProjects(previous => [...previous, project]);
+    setActiveProjectId(project.id);
+    setActiveTab('canvas');
+  };
+
+  const handleRenameProject = (name) => {
+    const nextName = name.trim();
+    if (!nextName) return;
+    setProjects(previous => previous.map(project =>
+      project.id === activeProjectId ? { ...project, name: nextName } : project
+    ));
+  };
+
+  const handleCanvasChange = useCallback(() => {
+    setCanvasStats(getCanvasStats(activeProjectId));
+  }, [activeProjectId]);
 
   // ⌘K / Ctrl+K focuses the header search box (the placeholder promises this)
   useEffect(() => {
@@ -143,7 +219,7 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         document
-          .querySelector('header input[type="text"]')
+        .querySelector('.header-search-input')
           ?.focus();
       }
     };
@@ -152,6 +228,7 @@ export default function App() {
   }, []);
 
   const handleTriggerCopilotTool = (toolId) => {
+    setCopilotOpen(false);
     if (toolId === 'related' || toolId === 'gaps') {
       setActiveTab('explorer');
       handleSearch(query || 'recent advances', 'hybrid', 0);
@@ -166,6 +243,7 @@ export default function App() {
   };
 
   const handleAddGeneratedTask = (todo) => {
+    setCopilotOpen(false);
     setTasks(prev => [{
       id: `task_${Date.now()}`,
       text: todo.text,
@@ -178,24 +256,8 @@ export default function App() {
   };
 
   const handleAddPaperToCanvas = (paper) => {
-    const saved = localStorage.getItem('srw_canvas_elements_v4');
-    const elems = saved ? JSON.parse(saved) : [];
-    const newNode = {
-      id: `paper_${paper.id || Date.now()}`,
-      type: 'paper',
-      title: paper.title,
-      text: paper.matching_snippet || paper.abstract || '',
-      authors: paper.authors || '',
-      venue: paper.venue || 'ArXiv',
-      year: paper.publication_year || 2024,
-      paperData: paper,
-      x: 140 + (elems.length % 5) * 35,
-      y: 140 + (elems.length % 5) * 28,
-      width: 255, height: 150,
-      bgColor: '#ffffff', textColor: '#0f172a'
-    };
-    localStorage.setItem('srw_canvas_elements_v4', JSON.stringify([...elems, newNode]));
-    setCanvasStats(getCanvasStats());
+    setCopilotOpen(false);
+    setCanvasPaperRequest({ id: Date.now(), projectId: activeProjectId, paper });
     setActiveTab('canvas');
   };
 
@@ -314,13 +376,17 @@ export default function App() {
 
       {/* ── Header ── */}
       <Header
-        projects={[]} // projects managed via Header inline rename, persisted to localStorage
+        projects={projects}
         selectedProject={selectedProject}
-        setSelectedProject={setSelectedProject}
+        setSelectedProject={handleRenameProject}
+        onSelectProject={setActiveProjectId}
+        onCreateProject={handleCreateProject}
         query={query}
         setQuery={setQuery}
         onSearch={() => { setActiveTab('explorer'); handleSearch(); }}
         onAskAi={handleAskAi}
+        onToggleCopilot={() => setCopilotOpen(open => !open)}
+        copilotOpen={copilotOpen}
         stats={healthStats}
       />
 
@@ -332,21 +398,31 @@ export default function App() {
           setActiveTab={setActiveTab}
           stats={mergedStats}
           taskCount={tasks.length}
+          projects={projects}
+          activeProjectId={activeProjectId}
+          onSelectProject={setActiveProjectId}
+          onCreateProject={handleCreateProject}
+          papers={libraryPapers}
+          onSelectPaper={handleInspectPaper}
         />
 
-        {/* ── Center ── */}
-        <main className="workspace-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '14px', overflow: 'hidden', gap: '12px' }}>
+        <div className="workspace-content">
+          {/* ── Center ── */}
+          <main className="workspace-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '14px', overflow: 'hidden', gap: '12px' }}>
 
           {/* === Canvas Tab === */}
           {(activeTab === 'canvas' || activeTab === 'workspace') && (
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', gap: '10px' }}>
 
               {/* Whiteboard */}
-              <div style={{ flex: 1, minHeight: 0 }}>
+              <div className="workspace-canvas-host">
                 <ResearchCanvas
+                  key={activeProjectId}
+                  projectId={activeProjectId}
+                  addPaperRequest={canvasPaperRequest}
                   libraryPapers={libraryPapers}
                   onInspectPaper={handleInspectPaper}
-                  onCanvasChange={() => setCanvasStats(getCanvasStats())}
+                  onCanvasChange={handleCanvasChange}
                 />
               </div>
 
@@ -472,7 +548,7 @@ export default function App() {
           {/* === AI Assistant Tab === */}
           {activeTab === 'assistant' && (
             <div style={{ flex: 1, overflowY: 'auto' }}>
-              <AiAssistant papers={libraryPapers} />
+              <AiAssistant papers={libraryPapers} initialQuestion={assistantPrompt} />
             </div>
           )}
 
@@ -494,14 +570,23 @@ export default function App() {
               <TasksWidget tasks={tasks} setTasks={setTasks} />
             </div>
           )}
-        </main>
+          </main>
 
         {/* Right Research Copilot */}
-        <CopilotSidebar
-          onTriggerTool={handleTriggerCopilotTool}
-          onAddGeneratedTask={handleAddGeneratedTask}
-          onAddPaperToCanvas={handleAddPaperToCanvas}
-        />
+          {copilotOpen && (
+            <>
+              <button className="copilot-scrim" aria-label="Close research copilot" onClick={() => setCopilotOpen(false)} />
+              <CopilotSidebar
+                onClose={() => setCopilotOpen(false)}
+                onTriggerTool={handleTriggerCopilotTool}
+                onAddGeneratedTask={handleAddGeneratedTask}
+                onAddPaperToCanvas={handleAddPaperToCanvas}
+                projectId={activeProjectId}
+                projectName={selectedProject}
+              />
+            </>
+          )}
+        </div>
       </div>
 
       {/* Paper detail slide-over */}
